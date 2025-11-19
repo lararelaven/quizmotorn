@@ -6,11 +6,9 @@ import { supabase } from '@/lib/supabase';
 export default function TeacherLobby({ session, dispatch }) {
     const [copied, setCopied] = useState(false);
 
-    // Lyssna på nya spelare i realtid
     useEffect(() => {
         if (!session?.id) return;
 
-        // 1. Hämta befintliga spelare direkt
         const fetchExistingPlayers = async () => {
             const { data } = await supabase
                 .from('players')
@@ -25,7 +23,6 @@ export default function TeacherLobby({ session, dispatch }) {
         };
         fetchExistingPlayers();
 
-        // 2. Prenumerera på NYA spelare
         const channel = supabase
             .channel('lobby_players')
             .on(
@@ -63,16 +60,16 @@ export default function TeacherLobby({ session, dispatch }) {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // URL att visa för eleverna (kan hårdkodas om du vill att de ska gå till en specifik domän)
     const displayUrl = typeof window !== 'undefined' ? window.location.host : 'quizmotorn.se';
+    const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}?pin=${session.pin_code}` : `https://${displayUrl}?pin=${session.pin_code}`;
+    // Använd API för att generera QR-kod
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(joinUrl)}&color=0f172a`;
 
     return (
         <div className="min-h-screen bg-[#0f172a] text-white flex flex-col relative overflow-hidden font-sans">
             
-            {/* Topp-sektion */}
             <div className="flex justify-between items-start p-8 z-10">
                 
-                {/* Vänster: PIN och Länk */}
                 <div className="space-y-4">
                     <button 
                         onClick={() => dispatch({ type: 'SET_VIEW', payload: 'teacher_dashboard' })} 
@@ -96,18 +93,18 @@ export default function TeacherLobby({ session, dispatch }) {
 
                         <div className="text-slate-400 text-sm font-bold uppercase tracking-wider mb-1">Med kod:</div>
                         <div className="text-7xl md:text-9xl font-black tracking-widest text-white drop-shadow-xl font-mono">
-                            {session.pin_code}
+                            {/* HÄR ÄR RÄTT VARIABEL: pin_code */}
+                            {session.pin_code} 
                         </div>
                     </div>
                 </div>
 
-                {/* Höger: QR Kod */}
                 <div className="bg-white p-4 rounded-xl shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-300">
-                    <QrCode className="w-32 h-32 md:w-48 md:h-48 text-slate-900" />
+                    {/* Riktig QR Kod */}
+                    <img src={qrCodeUrl} alt="QR Code" className="w-32 h-32 md:w-48 md:h-48 object-contain" />
                 </div>
             </div>
 
-            {/* Center: Spelarlista eller "Väntar..." */}
             <main className="flex-1 flex flex-col items-center justify-center p-8 w-full max-w-7xl mx-auto z-10">
                 {(!session.players || session.players.length === 0) ? (
                     <div className="text-center animate-pulse opacity-50">
@@ -127,7 +124,6 @@ export default function TeacherLobby({ session, dispatch }) {
                 )}
             </main>
 
-            {/* Botten-list */}
             <footer className="bg-slate-900/80 backdrop-blur-md border-t border-white/5 p-6 flex justify-between items-center sticky bottom-0 z-20">
                 <div className="flex items-center gap-3 text-slate-300">
                     <Users className="w-6 h-6" />
