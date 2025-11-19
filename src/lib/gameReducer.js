@@ -8,7 +8,8 @@ export const initialState = {
     categories: DEFAULT_CATEGORIES,
     editingQuizIndex: null,
     session: {
-        pin: null,
+        id: null,          // NYTT: Vi behöver ID för att koppla mot DB
+        pin_code: null,    // NYTT: Bytte namn från 'pin' till 'pin_code' för att matcha DB
         status: 'idle',
         currentQuestionIndex: -1,
         questionStartTime: null,
@@ -37,29 +38,35 @@ export const gameReducer = (state, action) => {
     switch (action.type) {
         case 'LOGIN_TEACHER':
             return { ...state, view: 'teacher_dashboard', user: action.payload };
+        case 'SET_QUIZZES': {
+            const loadedQuizzes = action.payload;
+            const existingCategories = new Set(state.categories);
+            loadedQuizzes.forEach(q => {
+                if (q.category) existingCategories.add(q.category);
+            });
+            return {
+                ...state,
+                savedQuizzes: loadedQuizzes,
+                categories: Array.from(existingCategories)
+            };
+        }
         case 'ADD_CATEGORY':
             if (state.categories.includes(action.payload)) return state;
             return { ...state, categories: [...state.categories, action.payload] };
         case 'DELETE_CATEGORY':
             return { ...state, categories: state.categories.filter(c => c !== action.payload) };
         case 'SAVE_QUIZ': {
-    // ÄNDRA DENNA RAD:
-    // Gammal kod: const newImportedQuiz = { ...action.payload, id: Date.now() };
-    
-    // Ny kod: Använd ID från payload (UUID från Supabase) om det finns, annars fallback till timestamp
-    const newImportedQuiz = { 
-        ...action.payload, 
-        id: action.payload.id || Date.now() 
-    };
-
-    if (!newImportedQuiz.category) newImportedQuiz.category = "Allmänt";
-
-    let updatedCats = state.categories;
-    if (!state.categories.includes(newImportedQuiz.category)) {
-        updatedCats = [...state.categories, newImportedQuiz.category];
-    }
-    return { ...state, savedQuizzes: [...state.savedQuizzes, newImportedQuiz], categories: updatedCats };
-}
+            const newImportedQuiz = { 
+                ...action.payload, 
+                id: action.payload.id || Date.now() 
+            };
+            if (!newImportedQuiz.category) newImportedQuiz.category = "Allmänt";
+            let updatedCats = state.categories;
+            if (!state.categories.includes(newImportedQuiz.category)) {
+                updatedCats = [...state.categories, newImportedQuiz.category];
+            }
+            return { ...state, savedQuizzes: [...state.savedQuizzes, newImportedQuiz], categories: updatedCats };
+        }
         case 'DELETE_QUIZ':
             return { ...state, savedQuizzes: state.savedQuizzes.filter((_, i) => i !== action.payload) };
         case 'START_EDITING_QUIZ':
@@ -69,19 +76,16 @@ export const gameReducer = (state, action) => {
         case 'SAVE_EDITED_QUIZ': {
             const updatedQuiz = { ...action.payload };
             if (!updatedQuiz.category) updatedQuiz.category = "Allmänt";
-
             const updatedQuizzesList = [...state.savedQuizzes];
             if (state.editingQuizIndex !== null && state.editingQuizIndex >= 0) {
                 updatedQuizzesList[state.editingQuizIndex] = updatedQuiz;
             } else {
                 updatedQuizzesList.push({ ...updatedQuiz, id: Date.now() });
             }
-
             let updatedCatsAfterEdit = state.categories;
             if (!state.categories.includes(updatedQuiz.category)) {
                 updatedCatsAfterEdit = [...state.categories, updatedQuiz.category];
             }
-
             return {
                 ...state,
                 savedQuizzes: updatedQuizzesList,
@@ -97,15 +101,18 @@ export const gameReducer = (state, action) => {
             return { ...state, savedQuizzes: quizzesWithUpdatedTitle };
         }
         case 'CREATE_SESSION': {
+            // Här hämtar vi datan som skapades i Dashboard (från Supabase)
+            const { sessionId, pinCode, quizData, settings } = action.payload;
+
             let jeopardyTeams = [];
             let questionModifiers = [];
 
-            if (action.payload.settings.gameMode === 'jeopardy') {
-                const teamNames = action.payload.settings.teamNames || generateTeamNames(action.payload.settings.jeopardyTeams);
+            if (settings.gameMode === 'jeopardy') {
+                const teamNames = settings.teamNames || generateTeamNames(settings.jeopardyTeams);
                 for (let i = 0; i < teamNames.length; i++) {
                     jeopardyTeams.push({ name: teamNames[i], score: 0 });
                 }
-                const qCount = action.payload.quizData.questions.length;
+                const qCount = quizData.questions.length;
                 for (let i = 0; i < qCount; i++) {
                     const rand = Math.random();
                     if (rand < 0.10) questionModifiers.push('gamble');
@@ -116,14 +123,15 @@ export const gameReducer = (state, action) => {
 
             return {
                 ...state,
-                view: action.payload.settings.gameMode === 'solo' ? 'teacher_solo_share' :
-                    (action.payload.settings.gameMode === 'jeopardy' ? 'teacher_game' : 'teacher_lobby'),
+                view: settings.gameMode === 'solo' ? 'teacher_solo_share' :
+                    (settings.gameMode === 'jeopardy' ? 'teacher_game' : 'teacher_lobby'),
                 session: {
                     ...state.session,
-                    pin: generatePin(),
+                    id: sessionId,         // SPARAR ID FRÅN DB
+                    pin_code: pinCode,     // SPARAR PIN FRÅN DB
                     status: 'lobby',
-                    quizData: action.payload.quizData,
-                    settings: { ...state.session.settings, ...action.payload.settings },
+                    quizData: quizData,
+                    settings: { ...state.session.settings, ...settings },
                     players: [],
                     lobbyReactions: [],
                     jeopardyState: {
@@ -135,34 +143,14 @@ export const gameReducer = (state, action) => {
                 }
             };
         }
-        case 'PLAYER_JOIN':
+        case 'ADD_PLAYER': // Bytte namn för att vara tydlig (samma som PLAYER_JOIN)
+            // Kolla så vi inte lägger till samma spelare två gånger
+            if (state.session.players.find(p => p.id === action.payload.id)) return state;
             return {
                 ...state,
                 session: {
                     ...state.session,
                     players: [...state.session.players, { ...action.payload, lastAnsweredQuestionIndex: -1 }]
-                }
-            };
-        case 'SEND_REACTION': {
-            const newReaction = {
-                id: Date.now(),
-                emoji: action.payload.emoji,
-                left: Math.random() * 80 + 10
-            };
-            return {
-                ...state,
-                session: {
-                    ...state.session,
-                    lobbyReactions: [...state.session.lobbyReactions, newReaction]
-                }
-            };
-        }
-        case 'REMOVE_REACTION':
-            return {
-                ...state,
-                session: {
-                    ...state.session,
-                    lobbyReactions: state.session.lobbyReactions.filter(r => r.id !== action.payload)
                 }
             };
         case 'START_GAME':
@@ -191,27 +179,8 @@ export const gameReducer = (state, action) => {
                 }
             };
         case 'PLAYER_ANSWER': {
-            let points = 0;
-            if (action.payload.isCorrect) {
-                if (state.session.settings.scoreMode === 'speed' && state.session.settings.timerEnabled) {
-                    const timeTaken = Date.now() - state.session.questionStartTime;
-                    const totalTime = state.session.settings.timerDuration * 1000;
-                    const ratio = 1 - (timeTaken / totalTime);
-                    points = Math.round(500 + (500 * Math.max(0, ratio)));
-                } else {
-                    points = 100;
-                }
-            }
-            const updatedPlayersAnswer = state.session.players.map(p =>
-                p.id === action.payload.playerId
-                    ? {
-                        ...p,
-                        score: p.score + points,
-                        lastAnsweredQuestionIndex: state.session.currentQuestionIndex
-                    }
-                    : p
-            );
-            return { ...state, session: { ...state.session, players: updatedPlayersAnswer } };
+            // Uppdatera spelarens poäng lokalt om vi vill
+            return state; 
         }
         case 'JEOPARDY_AWARD_POINTS': {
             const { teamIndex, points: jPoints } = action.payload;
@@ -243,25 +212,6 @@ export const gameReducer = (state, action) => {
         case 'SET_CURRENT_PLAYER': return { ...state, currentPlayer: action.payload };
         case 'RESET_APP': return { ...state, view: 'teacher_dashboard', session: initialState.session };
         case 'LOGOUT': return initialState;
-        case 'SET_QUIZZES': {
-            // 1. Uppdatera listan med quiz
-            const loadedQuizzes = action.payload;
-
-            // 2. (Valfritt men bra) Återskapa kategorier som finns i de sparade quizzarna
-            // så att filter-knapparna dyker upp igen.
-            const existingCategories = new Set(state.categories);
-            loadedQuizzes.forEach(q => {
-                if (q.category) existingCategories.add(q.category);
-            });
-
-            return {
-                ...state,
-                savedQuizzes: loadedQuizzes,
-                categories: Array.from(existingCategories)
-            };
-        }
         default: return state;
     }
-
 };
-
