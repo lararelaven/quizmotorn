@@ -243,7 +243,25 @@ export const gameReducer = (state, action) => {
         case 'SET_CURRENT_PLAYER': return { ...state, currentPlayer: action.payload };
         case 'RESET_APP': return { ...state, view: 'teacher_dashboard', session: initialState.session };
         case 'LOGOUT': return initialState;
+        case 'SET_QUIZZES': {
+            // 1. Uppdatera listan med quiz
+            const loadedQuizzes = action.payload;
+
+            // 2. (Valfritt men bra) Återskapa kategorier som finns i de sparade quizzarna
+            // så att filter-knapparna dyker upp igen.
+            const existingCategories = new Set(state.categories);
+            loadedQuizzes.forEach(q => {
+                if (q.category) existingCategories.add(q.category);
+            });
+
+            return {
+                ...state,
+                savedQuizzes: loadedQuizzes,
+                categories: Array.from(existingCategories)
+            };
+        }
         default: return state;
     }
 
 };
+
