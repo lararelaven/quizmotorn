@@ -1,8 +1,10 @@
+// src/components/student/Login.jsx
+
 'use client';
 import React, { useState } from 'react';
 import { Shuffle, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { generateRandomName } from '../../lib/utils';
+import { generateRandomName } from '../../lib/utils'; 
 
 export default function StudentLogin({ dispatch }) {
     const [pin, setPin] = useState('');
@@ -20,49 +22,46 @@ export default function StudentLogin({ dispatch }) {
             // 1. Hitta sessionen i Supabase via PIN
             const { data: session, error: sessionError } = await supabase
                 .from('sessions')
-                .select('*')
+                .select('*, quiz:quiz_id(*)') // Hämta all sessionsdata
                 .eq('pin_code', pin)
                 .single();
 
             if (sessionError || !session) {
-                throw new Error("Hittade ingen session med den koden.");
+                throw new Error("Hittade ingen session med den koden. Kontrollera koden.");
             }
 
             if (session.status !== 'lobby') {
                 throw new Error("Spelet har redan startat eller är avslutat.");
             }
 
-            // 2. Bestäm namn (Ta hänsyn till om läraren tvingat slumpade namn)
+            // 2. Bestäm namn
             let finalName = name.trim();
-
-            // Om läraren tvingar slumpade namn ELLER om inget namn angivits -> Slumpa
             if (session.settings?.forceRandomNames || !finalName) {
                 finalName = generateRandomName();
             }
 
-            // 3. Lägg till spelare i databasen
+            // 3. Lägg till spelare i databasen - Minimal insert
             const { data: player, error: playerError } = await supabase
                 .from('players')
                 .insert([{
                     session_id: session.id,
                     name: finalName,
-                    score: 0,
-                    answers: {}
                 }])
                 .select()
                 .single();
 
             if (playerError) throw playerError;
 
-            // 4. Lyckat! Uppdatera appen och gå till lobby
+            // 4. Lyckat! Skicka både session- och spelardata till reducern
             dispatch({
-                type: 'JOIN_SESSION',
+                type: 'STUDENT_JOIN_SESSION',
                 payload: { session, player }
             });
 
+
         } catch (err) {
-            console.error(err);
-            setError(err.message || "Något gick fel. Försök igen.");
+            console.error("Student Join Error:", err);
+            setError(err.message || "Ett oväntat fel uppstod. Försök igen.");
         } finally {
             setLoading(false);
         }
@@ -104,7 +103,7 @@ export default function StudentLogin({ dispatch }) {
                         <button
                             onClick={() => setName(generateRandomName())}
                             disabled={loading}
-                            className="p-4 bg-pink-100 text-pink-600 border-2 border-pink-200 rounded-xl hover:bg-pink-200 active:scale-95 transition-transform disabled:opacity-50"
+                            className="p-4 bg-pink-100 text-pink-600 border-2 border-pink-200 rounded-xl hover:bg-pink-200 active:scale-95 transition-transform disabled:opacity-50 cursor-pointer"
                             title="Slumpa namn"
                         >
                             <Shuffle className="w-6 h-6" />
@@ -133,7 +132,7 @@ export default function StudentLogin({ dispatch }) {
 
                 <button
                     onClick={() => dispatch({ type: 'SET_VIEW', payload: 'landing' })}
-                    className="w-full mt-2 text-slate-400 hover:text-slate-600 text-sm font-bold"
+                    className="w-full mt-2 text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
                     disabled={loading}
                 >
                     Avbryt
@@ -141,4 +140,4 @@ export default function StudentLogin({ dispatch }) {
             </div>
         </div>
     );
-};
+}
