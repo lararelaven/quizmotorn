@@ -139,25 +139,22 @@ export default function TeacherDashboard({ state, dispatch }) {
         }
     };
 
-    // --- NY LOGIK FÖR ATT STARTA SESSIONER ---
+    // --- SKAPA SESSION I DB (ENDAST FÖR LIVE QUIZ) ---
     const createSessionInDb = async (quiz, gameMode, settings) => {
         setStartingSession(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error("Ingen användare");
+            const pinCode = generatePin(); 
 
-            const pinCode = generatePin(); // Generera PIN
-
+            // Tog bort 'creator_id' härifrån eftersom din databas saknar den kolumnen
             const { data: sessionData, error } = await supabase
                 .from('sessions')
                 .insert([{
                     quiz_id: quiz.id,
-                    creator_id: user.id,
                     pin_code: pinCode,
                     status: 'lobby',
                     game_mode: gameMode,
-                    settings: settings, // Spara inställningar som JSON
-                    quiz_snapshot: quiz // Spara en kopia av quizet så det inte ändras mitt i spelet
+                    settings: settings, 
+                    quiz_snapshot: quiz 
                 }])
                 .select()
                 .single();
@@ -167,7 +164,8 @@ export default function TeacherDashboard({ state, dispatch }) {
             return { sessionData, pinCode };
 
         } catch (err) {
-            alert("Kunde inte starta session: " + err.message);
+            // Använd setError istället för alert så det syns snyggt i UI
+            setError("Kunde inte starta session: " + err.message);
             return null;
         } finally {
             setStartingSession(false);
@@ -177,19 +175,17 @@ export default function TeacherDashboard({ state, dispatch }) {
     const openJeopardySetup = (quiz) => setJeopardyConfig({ quiz, teams: 3, teamNames: generateTeamNames(3) });
     const openLiveSetup = (quiz) => setLiveConfig({ quiz, timerEnabled: false, timerDuration: 30, forceRandomNames: false, scoreMode: 'speed' });
 
-    const startJeopardy = async () => {
+    // --- JEOPARDY (OFFLINE / LOKALT) ---
+    const startJeopardy = () => {
         if (!jeopardyConfig) return;
         const settings = { gameMode: 'jeopardy', jeopardyTeams: jeopardyConfig.teams, teamNames: jeopardyConfig.teamNames };
         
-        // Skapa i DB
-        const result = await createSessionInDb(jeopardyConfig.quiz, 'jeopardy', settings);
-        if (!result) return;
-
+        // Körs lokalt utan databas
         dispatch({ 
             type: 'CREATE_SESSION', 
             payload: { 
-                sessionId: result.sessionData.id,
-                pinCode: result.pinCode,
+                sessionId: 'local-jeopardy', // Fake ID
+                pinCode: 'OFFLINE', 
                 quizData: jeopardyConfig.quiz, 
                 settings: settings 
             } 
@@ -197,13 +193,14 @@ export default function TeacherDashboard({ state, dispatch }) {
         setJeopardyConfig(null);
     };
 
+    // --- LIVE QUIZ (ONLINE / DB) ---
     const startLive = async () => {
         if (!liveConfig) return;
         const settings = { gameMode: 'live', timerEnabled: liveConfig.timerEnabled, timerDuration: liveConfig.timerDuration, forceRandomNames: liveConfig.forceRandomNames, scoreMode: liveConfig.scoreMode };
 
         // Skapa i DB
         const result = await createSessionInDb(liveConfig.quiz, 'live', settings);
-        if (!result) return;
+        if (!result) return; // Avbryt om fel uppstod
 
         dispatch({ 
             type: 'CREATE_SESSION', 
@@ -245,9 +242,6 @@ export default function TeacherDashboard({ state, dispatch }) {
             </header>
             <main className="max-w-6xl mx-auto p-6 space-y-12">
                 
-                {/* ... (Resten av layouten är oförändrad, kopiera bara in sektionerna för Create/Import och Bibliotek härifrån om du vill, men logiken ovan är det viktiga) ... */}
-                {/* För korthetens skull, klistra in sektionerna från din förra Dashboard här, de behöver inga ändringar förutom att de använder de nya funktionerna automatiskt */}
-                
                  <section>
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Plus className="w-6 h-6 text-indigo-400" /> Skapa / Importera</h2>
@@ -277,7 +271,8 @@ export default function TeacherDashboard({ state, dispatch }) {
                                     className="w-full h-32 font-mono text-[10px] p-3 bg-slate-950/50 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2 placeholder-white/20 scrollbar-hide resize-none"
                                     placeholder={DEFAULT_QUIZ_JSON}
                                 />
-                                {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
+                                {/* Visa felmeddelanden här om sessionen misslyckas starta */}
+                                {error && <p className="text-red-400 text-xs mb-2 bg-red-500/10 p-2 rounded border border-red-500/20">{error}</p>}
                             </div>
                             
                             <button 
@@ -346,9 +341,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                 </section>
             </main>
 
-            {/* ... (Popups för delete, category, jeopardy och live setup är oförändrade men måste vara med i koden) ... */}
-            {/* Klistra in popups här från föregående svar */}
-            {/* BEKRÄFTA RADERING MODAL */}
+            {/* POPUPS */}
             {quizToDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center transform transition-all scale-100">
@@ -356,7 +349,9 @@ export default function TeacherDashboard({ state, dispatch }) {
                             <AlertTriangle className="w-8 h-8" />
                         </div>
                         <h3 className="text-xl font-bold text-white mb-2">Är du säker?</h3>
-                        <p className="text-slate-400 mb-6 text-sm">Du är på väg att radera detta quiz permanent. Detta går inte att ångra.</p>
+                        <p className="text-slate-400 mb-6 text-sm">
+                            Du är på väg att radera detta quiz permanent. Detta går inte att ångra.
+                        </p>
                         <div className="flex gap-3">
                             <button onClick={() => setQuizToDelete(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-colors cursor-pointer border border-white/5">Avbryt</button>
                             <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all cursor-pointer">Radera</button>
@@ -374,7 +369,13 @@ export default function TeacherDashboard({ state, dispatch }) {
                         </div>
                         <div className="p-6 space-y-6">
                             <div className="flex gap-2">
-                                <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Ny kategori..." className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
+                                <input
+                                    type="text"
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    placeholder="Ny kategori..."
+                                    className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
                                 <button onClick={handleAddCategory} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 cursor-pointer">Lägg till</button>
                             </div>
                             <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
@@ -400,7 +401,12 @@ export default function TeacherDashboard({ state, dispatch }) {
                         <div className="p-8 space-y-8">
                             <div>
                                 <label className="block text-sm font-bold text-slate-300 mb-3">Antal Lag: <span className="text-orange-400 text-lg ml-1">{jeopardyConfig.teams}</span></label>
-                                <input type="range" min="2" max="6" value={jeopardyConfig.teams} onChange={(e) => setJeopardyConfig(p => ({ ...p, teams: parseInt(e.target.value), teamNames: generateTeamNames(parseInt(e.target.value)) }))} className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
+                                <input
+                                    type="range" min="2" max="6"
+                                    value={jeopardyConfig.teams}
+                                    onChange={(e) => setJeopardyConfig(p => ({ ...p, teams: parseInt(e.target.value), teamNames: generateTeamNames(parseInt(e.target.value)) }))}
+                                    className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                                />
                                 <div className="flex justify-between text-xs text-slate-500 mt-2 font-mono px-1"><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
                             </div>
                             <div className="bg-slate-950/50 p-5 rounded-2xl border border-white/10">
@@ -431,7 +437,13 @@ export default function TeacherDashboard({ state, dispatch }) {
                             <div className="bg-slate-800/50 p-5 rounded-2xl border border-white/10">
                                 <div className="flex items-center justify-between mb-6">
                                     <div><div className="font-bold text-white">Tid per fråga</div><div className="text-xs text-slate-400 mt-1">Begränsa svarstiden</div></div>
-                                    <button onClick={() => setLiveConfig(p => { const newEnabled = !p.timerEnabled; return { ...p, timerEnabled: newEnabled, scoreMode: newEnabled ? p.scoreMode : 'simple' }; })} className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.timerEnabled ? 'bg-green-500' : 'bg-slate-600'}`}>
+                                    <button
+                                        onClick={() => setLiveConfig(p => {
+                                            const newEnabled = !p.timerEnabled;
+                                            return { ...p, timerEnabled: newEnabled, scoreMode: newEnabled ? p.scoreMode : 'simple' };
+                                        })}
+                                        className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.timerEnabled ? 'bg-green-500' : 'bg-slate-600'}`}
+                                    >
                                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.timerEnabled ? 'left-7' : 'left-1'}`} />
                                     </button>
                                 </div>
