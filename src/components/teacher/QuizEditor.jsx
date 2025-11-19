@@ -1,15 +1,15 @@
 'use client';
 import React, { useState, useRef } from 'react';
 import {
-    ArrowLeft, Save, Trash2, ImageIcon, Upload, Plus, MinusCircle, Tag
+    ArrowLeft, Save, Trash2, ImageIcon, Upload, Plus, MinusCircle, Tag, AlertCircle
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase'; // Importera Supabase
+import { supabase } from '@/lib/supabase';
 
 export default function QuizEditor({ quizToEdit, categories, dispatch }) {
-    // Standardvärde "Allmänt" om ingen kategori finns
     const [quiz, setQuiz] = useState(quizToEdit ? JSON.parse(JSON.stringify(quizToEdit)) : { title: "Nytt Quiz", category: categories?.[0] || "Allmänt", questions: [] });
     const fileInputRefs = useRef([]);
-    const [saving, setSaving] = useState(false); // Lägg till laddningsstate för sparning
+    const [saving, setSaving] = useState(false);
+    const [editorError, setEditorError] = useState(null); // Ny state för felmeddelanden istället för alert
 
     const handleQuestionChange = (idx, field, value) => {
         const updatedQuestions = [...quiz.questions];
@@ -32,11 +32,10 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
     const removeOption = (qIdx, optIdx) => {
         const updatedQuestions = [...quiz.questions];
         if (updatedQuestions[qIdx].options.length <= 2) {
-            alert("Minst 2 alternativ krävs.");
+            // alert("Minst 2 alternativ krävs."); -> Ignorera bara
             return;
         }
         updatedQuestions[qIdx].options.splice(optIdx, 1);
-        // Justera index för rätt svar om vi tar bort ett alternativ ovanför eller samma
         if (updatedQuestions[qIdx].correctAnswerIndex >= optIdx) {
             updatedQuestions[qIdx].correctAnswerIndex = Math.max(0, updatedQuestions[qIdx].correctAnswerIndex - 1);
         }
@@ -53,10 +52,10 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
         reader.readAsDataURL(file);
     };
 
-    // --- NYTT: Spara till DB ---
     const handleSave = async () => {
-        if (!quiz.title.trim()) { alert("Titel saknas!"); return; }
-        if (quiz.questions.length === 0) { alert("Lägg till minst en fråga."); return; }
+        setEditorError(null);
+        if (!quiz.title.trim()) { setEditorError("Titel saknas!"); return; }
+        if (quiz.questions.length === 0) { setEditorError("Lägg till minst en fråga."); return; }
 
         setSaving(true);
 
@@ -69,7 +68,6 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
                 category: quiz.category,
                 questions: quiz.questions,
                 creator_id: user.id,
-                // Om vi redigerar ett befintligt quiz, skicka med ID så Supabase uppdaterar det
                 ...(quiz.id && { id: quiz.id })
             };
 
@@ -81,33 +79,34 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
 
             if (error) throw error;
 
-            // Uppdatera reducer och gå tillbaka
             dispatch({ type: 'SAVE_EDITED_QUIZ', payload: data });
-            alert("Quiz sparat!");
+            // alert("Quiz sparat!"); -> Borta, vi byter bara vy
             dispatch({ type: 'SET_VIEW', payload: 'teacher_dashboard' });
 
         } catch (err) {
-            alert("Kunde inte spara: " + err.message);
+            setEditorError("Kunde inte spara: " + err.message);
         } finally {
             setSaving(false);
         }
     };
-    // ---------------------------
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-black pb-12 text-white">
             <header className="bg-white/5 backdrop-blur-md border-b border-white/10 px-6 py-4 sticky top-0 z-10 flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => dispatch({ type: 'SET_VIEW', payload: 'teacher_dashboard' })} className="p-2 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors"><ArrowLeft className="w-6 h-6" /></button>
+                    <button onClick={() => dispatch({ type: 'SET_VIEW', payload: 'teacher_dashboard' })} className="p-2 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors cursor-pointer"><ArrowLeft className="w-6 h-6" /></button>
                     <h1 className="font-bold text-xl">Redigera Quiz</h1>
                 </div>
-                <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-500 flex items-center gap-2 shadow-lg shadow-green-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Save className="w-4 h-4" /> {saving ? 'Sparar...' : 'Spara'}
-                </button>
+                <div className="flex items-center gap-4">
+                     {editorError && <div className="text-red-400 text-sm font-bold flex items-center gap-2 bg-red-500/10 px-3 py-1 rounded border border-red-500/20"><AlertCircle className="w-4 h-4"/>{editorError}</div>}
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-500 flex items-center gap-2 shadow-lg shadow-green-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                        <Save className="w-4 h-4" /> {saving ? 'Sparar...' : 'Spara'}
+                    </button>
+                </div>
             </header>
             <main className="max-w-4xl mx-auto p-6 space-y-8">
                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm space-y-4">
@@ -145,7 +144,7 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
                                 const updated = [...quiz.questions];
                                 updated.splice(qIdx, 1);
                                 setQuiz({ ...quiz, questions: updated });
-                            }} className="text-red-400 hover:text-red-300 p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"><Trash2 className="w-5 h-5" /></button>
+                            }} className="text-red-400 hover:text-red-300 p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors cursor-pointer"><Trash2 className="w-5 h-5" /></button>
                         </div>
 
                         <div className="flex items-center gap-2 mb-4">
@@ -173,7 +172,7 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
                                     className="flex-1 p-3 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                                 />
                                 <input type="file" accept="image/*" className="hidden" ref={el => fileInputRefs.current[qIdx] = el} onChange={(e) => handleImageUpload(qIdx, e)} />
-                                <button onClick={() => fileInputRefs.current[qIdx].click()} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-500 flex items-center gap-2 transition-colors"><Upload className="w-4 h-4" /> Ladda upp</button>
+                                <button onClick={() => fileInputRefs.current[qIdx].click()} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-500 flex items-center gap-2 transition-colors cursor-pointer"><Upload className="w-4 h-4" /> Ladda upp</button>
                             </div>
                             {q.image && <img src={q.image} alt="Preview" className="mt-4 h-32 rounded-xl border border-white/10 object-contain bg-black/40" />}
                         </div>
@@ -198,10 +197,10 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
                                             onChange={(e) => handleOptionChange(qIdx, optIdx, e.target.value)}
                                             className={`flex-1 p-3 border rounded-xl text-sm bg-slate-950/50 text-white outline-none focus:ring-2 ${q.correctAnswerIndex === optIdx ? 'border-green-500 ring-1 ring-green-500/50' : 'border-white/10 focus:ring-indigo-500'}`}
                                         />
-                                        <button onClick={() => removeOption(qIdx, optIdx)} className="text-slate-500 hover:text-red-400 transition-colors"><MinusCircle className="w-6 h-6" /></button>
+                                        <button onClick={() => removeOption(qIdx, optIdx)} className="text-slate-500 hover:text-red-400 transition-colors cursor-pointer"><MinusCircle className="w-6 h-6" /></button>
                                     </div>
                                 ))}
-                                <button onClick={() => addOption(qIdx)} className="text-sm text-indigo-400 font-bold hover:text-indigo-300 flex items-center gap-1 mt-2 px-2 py-1 rounded hover:bg-white/5 transition-colors"><Plus className="w-4 h-4" /> Lägg till alternativ</button>
+                                <button onClick={() => addOption(qIdx)} className="text-sm text-indigo-400 font-bold hover:text-indigo-300 flex items-center gap-1 mt-2 px-2 py-1 rounded hover:bg-white/5 transition-colors cursor-pointer"><Plus className="w-4 h-4" /> Lägg till alternativ</button>
                             </div>
                         </div>
 
@@ -218,7 +217,7 @@ export default function QuizEditor({ quizToEdit, categories, dispatch }) {
 
                 <button
                     onClick={() => { const newQ = { question: "Ny fråga?", options: ["Alt 1", "Alt 2"], correctAnswerIndex: 0, explanation: "" }; setQuiz({ ...quiz, questions: [...quiz.questions, newQ] }); }}
-                    className="w-full py-4 border-2 border-dashed border-white/20 rounded-2xl text-slate-400 font-bold hover:border-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 border-2 border-dashed border-white/20 rounded-2xl text-slate-400 font-bold hover:border-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                     <Plus className="w-6 h-6" /> Lägg till Fråga
                 </button>
