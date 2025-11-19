@@ -17,7 +17,6 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
     
-    // Nytt state för att hantera raderings-popupen
     const [quizToDelete, setQuizToDelete] = useState(null);
 
     useEffect(() => {
@@ -94,12 +93,10 @@ export default function TeacherDashboard({ state, dispatch }) {
         }
     };
 
-    // Initiera radering (öppna popup)
     const initiateDelete = (quizId, index) => {
         setQuizToDelete({ id: quizId, index: index });
     };
 
-    // Bekräfta radering (utförs när man klickar "Ja" i popupen)
     const confirmDelete = async () => {
         if (!quizToDelete) return;
 
@@ -114,7 +111,7 @@ export default function TeacherDashboard({ state, dispatch }) {
             }
         }
         dispatch({ type: 'DELETE_QUIZ', payload: index });
-        setQuizToDelete(null); // Stäng popup
+        setQuizToDelete(null);
     };
 
     const handleCopyPrompt = () => {
@@ -186,29 +183,34 @@ export default function TeacherDashboard({ state, dispatch }) {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
-                            <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-32 overflow-y-auto shadow-inner select-all">{AI_PROMPT_TEXT}</div>
+                        {/* Vänster sida: AI-Hjälpen */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
+                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-32 overflow-y-auto shadow-inner select-all">{AI_PROMPT_TEXT}</div>
+                            </div>
                             <button onClick={handleCopyPrompt} className="mt-2 w-full py-2 bg-indigo-600/80 text-white font-bold rounded-lg hover:bg-indigo-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5 cursor-pointer"><Copy className="w-3 h-3" /> Kopiera Prompt</button>
                         </div>
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col backdrop-blur-sm">
-                            <div className="flex items-center gap-2 mb-2 text-white font-bold text-sm"><Copy className="w-4 h-4 text-indigo-400" /> Klistra in JSON</div>
-                            <textarea
-                                value={jsonInput}
-                                onChange={(e) => setJsonInput(e.target.value)}
-                                className="w-full flex-1 min-h-[140px] font-mono text-[10px] p-3 bg-slate-950/50 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2 placeholder-white/20 scrollbar-hide"
-                                placeholder={DEFAULT_QUIZ_JSON}
-                            />
-                            {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
+
+                        {/* Höger sida: JSON Import */}
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between backdrop-blur-sm">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2 text-white font-bold text-sm"><Copy className="w-4 h-4 text-indigo-400" /> Klistra in JSON</div>
+                                <textarea
+                                    value={jsonInput}
+                                    onChange={(e) => setJsonInput(e.target.value)}
+                                    className="w-full h-32 font-mono text-[10px] p-3 bg-slate-950/50 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2 placeholder-white/20 scrollbar-hide resize-none"
+                                    placeholder={DEFAULT_QUIZ_JSON}
+                                />
+                                {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
+                            </div>
                             
-                            {/* NY SNYGGARE KNAPP */}
                             <button 
                                 onClick={handleSaveQuiz} 
-                                className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/10 group"
+                                className="mt-0 w-full py-2 bg-green-600/80 text-white font-bold rounded-lg hover:bg-green-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5 cursor-pointer"
                             >
-                                <Save className="w-4 h-4 group-hover:scale-110 transition-transform" /> Spara till Bibliotek
+                                <Save className="w-3 h-3" /> Spara till Bibliotek
                             </button>
-
                         </div>
                     </div>
                 </section>
@@ -252,8 +254,6 @@ export default function TeacherDashboard({ state, dispatch }) {
                                                 </div>
                                                 <div className="flex gap-1">
                                                     <button onClick={() => dispatch({ type: 'START_EDITING_QUIZ', payload: idx })} className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Redigera"><Edit2 className="w-4 h-4" /></button>
-                                                    
-                                                    {/* RADERA-KNAPP SOM NU ÖPPNAR POPUP */}
                                                     <button onClick={() => initiateDelete(quiz.id, idx)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Radera"><Trash2 className="w-4 h-4" /></button>
                                                 </div>
                                             </div>
@@ -271,9 +271,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                 </section>
             </main>
 
-            {/* --- POPUP MODALS --- */}
-
-            {/* BEKRÄFTA RADERING MODAL (NY) */}
+            {/* POPUPS */}
             {quizToDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center transform transition-all scale-100">
@@ -285,24 +283,13 @@ export default function TeacherDashboard({ state, dispatch }) {
                             Du är på väg att radera detta quiz permanent. Detta går inte att ångra.
                         </p>
                         <div className="flex gap-3">
-                            <button 
-                                onClick={() => setQuizToDelete(null)} 
-                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-colors cursor-pointer border border-white/5"
-                            >
-                                Avbryt
-                            </button>
-                            <button 
-                                onClick={confirmDelete} 
-                                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all cursor-pointer"
-                            >
-                                Radera
-                            </button>
+                            <button onClick={() => setQuizToDelete(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-colors cursor-pointer border border-white/5">Avbryt</button>
+                            <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all cursor-pointer">Radera</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* CATEGORY MANAGER MODAL */}
             {showCategoryManager && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/10 animate-fade-in">
@@ -334,7 +321,6 @@ export default function TeacherDashboard({ state, dispatch }) {
                 </div>
             )}
 
-            {/* JEOPARDY MODAL */}
             {jeopardyConfig && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
                     <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
