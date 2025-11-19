@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import {
     Plus, Bot, Copy, BookOpen, Edit2, Trash2, Smartphone, Grid,
-    Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight, AlertTriangle, Save
+    Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight, AlertTriangle, Save, Loader2
 } from 'lucide-react';
 import { AI_PROMPT_TEXT, DEFAULT_QUIZ_JSON } from '../../lib/constants';
-import { generateTeamNames } from '../../lib/utils';
+import { generateTeamNames, generatePin } from '../../lib/utils';
 import { supabase } from '@/lib/supabase';
 
 export default function TeacherDashboard({ state, dispatch }) {
@@ -16,8 +16,10 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [selectedCategory, setSelectedCategory] = useState("Alla");
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
-    
     const [quizToDelete, setQuizToDelete] = useState(null);
+    
+    // Laddnings-state för att starta session
+    const [startingSession, setStartingSession] = useState(false);
 
     useEffect(() => {
         const fetchQuizzes = async () => {
@@ -99,9 +101,7 @@ export default function TeacherDashboard({ state, dispatch }) {
 
     const confirmDelete = async () => {
         if (!quizToDelete) return;
-
         const { id, index } = quizToDelete;
-
         if (id) {
             const { error } = await supabase.from('quizzes').delete().eq('id', id);
             if (error) {
@@ -139,20 +139,84 @@ export default function TeacherDashboard({ state, dispatch }) {
         }
     };
 
+    // --- NY LOGIK FÖR ATT STARTA SESSIONER ---
+    const createSessionInDb = async (quiz, gameMode, settings) => {
+        setStartingSession(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Ingen användare");
+
+            const pinCode = generatePin(); // Generera PIN
+
+            const { data: sessionData, error } = await supabase
+                .from('sessions')
+                .insert([{
+                    quiz_id: quiz.id,
+                    creator_id: user.id,
+                    pin_code: pinCode,
+                    status: 'lobby',
+                    game_mode: gameMode,
+                    settings: settings, // Spara inställningar som JSON
+                    quiz_snapshot: quiz // Spara en kopia av quizet så det inte ändras mitt i spelet
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            return { sessionData, pinCode };
+
+        } catch (err) {
+            alert("Kunde inte starta session: " + err.message);
+            return null;
+        } finally {
+            setStartingSession(false);
+        }
+    };
+
     const openJeopardySetup = (quiz) => setJeopardyConfig({ quiz, teams: 3, teamNames: generateTeamNames(3) });
     const openLiveSetup = (quiz) => setLiveConfig({ quiz, timerEnabled: false, timerDuration: 30, forceRandomNames: false, scoreMode: 'speed' });
 
-    const startJeopardy = () => {
+    const startJeopardy = async () => {
         if (!jeopardyConfig) return;
-        dispatch({ type: 'CREATE_SESSION', payload: { quizData: jeopardyConfig.quiz, settings: { gameMode: 'jeopardy', jeopardyTeams: jeopardyConfig.teams, teamNames: jeopardyConfig.teamNames } } });
+        const settings = { gameMode: 'jeopardy', jeopardyTeams: jeopardyConfig.teams, teamNames: jeopardyConfig.teamNames };
+        
+        // Skapa i DB
+        const result = await createSessionInDb(jeopardyConfig.quiz, 'jeopardy', settings);
+        if (!result) return;
+
+        dispatch({ 
+            type: 'CREATE_SESSION', 
+            payload: { 
+                sessionId: result.sessionData.id,
+                pinCode: result.pinCode,
+                quizData: jeopardyConfig.quiz, 
+                settings: settings 
+            } 
+        });
         setJeopardyConfig(null);
     };
 
-    const startLive = () => {
+    const startLive = async () => {
         if (!liveConfig) return;
-        dispatch({ type: 'CREATE_SESSION', payload: { quizData: liveConfig.quiz, settings: { gameMode: 'live', timerEnabled: liveConfig.timerEnabled, timerDuration: liveConfig.timerDuration, forceRandomNames: liveConfig.forceRandomNames, scoreMode: liveConfig.scoreMode } } });
+        const settings = { gameMode: 'live', timerEnabled: liveConfig.timerEnabled, timerDuration: liveConfig.timerDuration, forceRandomNames: liveConfig.forceRandomNames, scoreMode: liveConfig.scoreMode };
+
+        // Skapa i DB
+        const result = await createSessionInDb(liveConfig.quiz, 'live', settings);
+        if (!result) return;
+
+        dispatch({ 
+            type: 'CREATE_SESSION', 
+            payload: { 
+                sessionId: result.sessionData.id,
+                pinCode: result.pinCode,
+                quizData: liveConfig.quiz, 
+                settings: settings 
+            } 
+        });
         setLiveConfig(null);
     }
+    // -----------------------------------------
 
     const filteredQuizzes = selectedCategory === "Alla"
         ? state.savedQuizzes
@@ -160,6 +224,16 @@ export default function TeacherDashboard({ state, dispatch }) {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-black pb-12 relative text-white">
+            {/* Visar laddnings-overlay om vi startar en session */}
+            {startingSession && (
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center backdrop-blur-sm">
+                    <div className="bg-white text-slate-900 p-6 rounded-xl flex items-center gap-4 shadow-2xl">
+                        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                        <span className="font-bold text-lg">Startar session...</span>
+                    </div>
+                </div>
+            )}
+
             <header className="bg-white/5 backdrop-blur-md border-b border-white/10 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg">
@@ -170,8 +244,11 @@ export default function TeacherDashboard({ state, dispatch }) {
                 <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 hover:bg-red-500/20 px-3 py-2 rounded-lg transition-colors font-medium cursor-pointer"><LogOut className="w-4 h-4" /> Logga ut</button>
             </header>
             <main className="max-w-6xl mx-auto p-6 space-y-12">
-
-                <section>
+                
+                {/* ... (Resten av layouten är oförändrad, kopiera bara in sektionerna för Create/Import och Bibliotek härifrån om du vill, men logiken ovan är det viktiga) ... */}
+                {/* För korthetens skull, klistra in sektionerna från din förra Dashboard här, de behöver inga ändringar förutom att de använder de nya funktionerna automatiskt */}
+                
+                 <section>
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Plus className="w-6 h-6 text-indigo-400" /> Skapa / Importera</h2>
                         <button
@@ -183,7 +260,6 @@ export default function TeacherDashboard({ state, dispatch }) {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Vänster sida: AI-Hjälpen */}
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center gap-2 mb-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
@@ -192,7 +268,6 @@ export default function TeacherDashboard({ state, dispatch }) {
                             <button onClick={handleCopyPrompt} className="mt-2 w-full py-2 bg-indigo-600/80 text-white font-bold rounded-lg hover:bg-indigo-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5 cursor-pointer"><Copy className="w-3 h-3" /> Kopiera Prompt</button>
                         </div>
 
-                        {/* Höger sida: JSON Import */}
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between backdrop-blur-sm">
                             <div>
                                 <div className="flex items-center gap-2 mb-2 text-white font-bold text-sm"><Copy className="w-4 h-4 text-indigo-400" /> Klistra in JSON</div>
@@ -207,7 +282,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                             
                             <button 
                                 onClick={handleSaveQuiz} 
-                                className="mt-0 w-full py-2 bg-green-600/80 text-white font-bold rounded-lg hover:bg-green-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5 cursor-pointer"
+                                className="mt-0 w-full py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg hover:shadow-emerald-500/20 hover:scale-[1.02] flex items-center justify-center gap-2 text-xs transition-all border border-white/5 cursor-pointer shadow-lg"
                             >
                                 <Save className="w-3 h-3" /> Spara till Bibliotek
                             </button>
@@ -271,7 +346,9 @@ export default function TeacherDashboard({ state, dispatch }) {
                 </section>
             </main>
 
-            {/* POPUPS */}
+            {/* ... (Popups för delete, category, jeopardy och live setup är oförändrade men måste vara med i koden) ... */}
+            {/* Klistra in popups här från föregående svar */}
+            {/* BEKRÄFTA RADERING MODAL */}
             {quizToDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center transform transition-all scale-100">
@@ -279,9 +356,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                             <AlertTriangle className="w-8 h-8" />
                         </div>
                         <h3 className="text-xl font-bold text-white mb-2">Är du säker?</h3>
-                        <p className="text-slate-400 mb-6 text-sm">
-                            Du är på väg att radera detta quiz permanent. Detta går inte att ångra.
-                        </p>
+                        <p className="text-slate-400 mb-6 text-sm">Du är på väg att radera detta quiz permanent. Detta går inte att ångra.</p>
                         <div className="flex gap-3">
                             <button onClick={() => setQuizToDelete(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-colors cursor-pointer border border-white/5">Avbryt</button>
                             <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all cursor-pointer">Radera</button>
@@ -299,13 +374,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                         </div>
                         <div className="p-6 space-y-6">
                             <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={newCategoryName}
-                                    onChange={(e) => setNewCategoryName(e.target.value)}
-                                    placeholder="Ny kategori..."
-                                    className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                />
+                                <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Ny kategori..." className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
                                 <button onClick={handleAddCategory} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 cursor-pointer">Lägg till</button>
                             </div>
                             <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
@@ -331,12 +400,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                         <div className="p-8 space-y-8">
                             <div>
                                 <label className="block text-sm font-bold text-slate-300 mb-3">Antal Lag: <span className="text-orange-400 text-lg ml-1">{jeopardyConfig.teams}</span></label>
-                                <input
-                                    type="range" min="2" max="6"
-                                    value={jeopardyConfig.teams}
-                                    onChange={(e) => setJeopardyConfig(p => ({ ...p, teams: parseInt(e.target.value), teamNames: generateTeamNames(parseInt(e.target.value)) }))}
-                                    className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                                />
+                                <input type="range" min="2" max="6" value={jeopardyConfig.teams} onChange={(e) => setJeopardyConfig(p => ({ ...p, teams: parseInt(e.target.value), teamNames: generateTeamNames(parseInt(e.target.value)) }))} className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
                                 <div className="flex justify-between text-xs text-slate-500 mt-2 font-mono px-1"><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
                             </div>
                             <div className="bg-slate-950/50 p-5 rounded-2xl border border-white/10">
@@ -367,13 +431,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                             <div className="bg-slate-800/50 p-5 rounded-2xl border border-white/10">
                                 <div className="flex items-center justify-between mb-6">
                                     <div><div className="font-bold text-white">Tid per fråga</div><div className="text-xs text-slate-400 mt-1">Begränsa svarstiden</div></div>
-                                    <button
-                                        onClick={() => setLiveConfig(p => {
-                                            const newEnabled = !p.timerEnabled;
-                                            return { ...p, timerEnabled: newEnabled, scoreMode: newEnabled ? p.scoreMode : 'simple' };
-                                        })}
-                                        className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.timerEnabled ? 'bg-green-500' : 'bg-slate-600'}`}
-                                    >
+                                    <button onClick={() => setLiveConfig(p => { const newEnabled = !p.timerEnabled; return { ...p, timerEnabled: newEnabled, scoreMode: newEnabled ? p.scoreMode : 'simple' }; })} className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.timerEnabled ? 'bg-green-500' : 'bg-slate-600'}`}>
                                         <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.timerEnabled ? 'left-7' : 'left-1'}`} />
                                     </button>
                                 </div>
