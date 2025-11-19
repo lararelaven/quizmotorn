@@ -1,6 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { Mail, Key, Loader2, AlertCircle } from 'lucide-react';
+// Använd @-alias för att importera från roten/src oavsett var filen ligger
 import { supabase } from '@/lib/supabase';
 
 export default function TeacherLogin({ dispatch }) {
@@ -15,7 +16,7 @@ export default function TeacherLogin({ dispatch }) {
         e.preventDefault();
         setErrorMsg(null);
         setInfoMsg(null);
-
+        
         if (!email || !password) {
             setErrorMsg("Fyll i både e-post och lösenord");
             return;
@@ -25,26 +26,13 @@ export default function TeacherLogin({ dispatch }) {
 
         try {
             if (isSignUp) {
-                // Registrera ny lärare (Fas 3: Punkt 1)
-                const { error } = await supabase.auth.signUp({
-                    email,
-                    password
-                });
+                const { error } = await supabase.auth.signUp({ email, password });
                 if (error) throw error;
-
-                // Visa instruktion om att kolla mejlen
                 setInfoMsg("Konto skapat! Kolla din mejl för bekräftelselänk.");
-                setIsSignUp(false);
+                setIsSignUp(false); 
             } else {
-                // Logga in befintlig lärare (Fas 3: Punkt 1)
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password
-                });
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-
-                // OBS: Vi gör ingen manuell dispatch här. 
-                // App.jsx (root) lyssnar på supabase.auth.onAuthStateChange och uppdaterar vyn.
             }
         } catch (error) {
             setErrorMsg(error.message);
@@ -59,6 +47,10 @@ export default function TeacherLogin({ dispatch }) {
         try {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
+                options: {
+                    // Skicka tillbaka användaren till startsidan efter inloggning
+                    redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+                }
             });
             if (error) throw error;
         } catch (error) {
@@ -74,7 +66,6 @@ export default function TeacherLogin({ dispatch }) {
                     {isSignUp ? 'Skapa konto' : 'Logga in'}
                 </h2>
 
-                {/* Error Message Box */}
                 {errorMsg && (
                     <div className="mb-6 p-3 bg-red-500/20 border border-red-500/50 rounded-xl flex items-center gap-2 text-red-200 text-sm text-left animate-in fade-in slide-in-from-top-2">
                         <AlertCircle className="w-4 h-4 shrink-0" />
@@ -82,7 +73,6 @@ export default function TeacherLogin({ dispatch }) {
                     </div>
                 )}
 
-                {/* Info Message Box */}
                 {infoMsg && (
                     <div className="mb-6 p-3 bg-green-500/20 border border-green-500/50 rounded-xl flex items-center gap-2 text-green-200 text-sm text-left animate-in fade-in slide-in-from-top-2">
                         <div className="w-2 h-2 bg-green-400 rounded-full shrink-0" />
@@ -90,8 +80,8 @@ export default function TeacherLogin({ dispatch }) {
                     </div>
                 )}
 
-                <button
-                    onClick={handleGoogleLogin}
+                <button 
+                    onClick={handleGoogleLogin} 
                     disabled={loading}
                     className="w-full py-3 px-6 bg-white text-slate-900 rounded-xl flex items-center justify-center gap-3 hover:bg-indigo-50 transition-colors mb-6 font-bold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -127,8 +117,8 @@ export default function TeacherLogin({ dispatch }) {
                             disabled={loading}
                         />
                     </div>
-                    <button
-                        type="submit"
+                    <button 
+                        type="submit" 
                         disabled={loading}
                         className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg hover:shadow-indigo-500/50 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -139,14 +129,14 @@ export default function TeacherLogin({ dispatch }) {
 
                 <div className="mt-6 text-sm text-indigo-200">
                     {isSignUp ? 'Har du redan ett konto?' : 'Har du inget konto?'}
-                    <button
-                        onClick={() => {
-                            setIsSignUp(!isSignUp);
-                            setEmail('');
-                            setPassword('');
-                            setErrorMsg(null);
+                    <button 
+                        onClick={() => { 
+                            setIsSignUp(!isSignUp); 
+                            setEmail(''); 
+                            setPassword(''); 
+                            setErrorMsg(null); 
                             setInfoMsg(null);
-                        }}
+                        }} 
                         className="ml-2 text-white font-bold hover:underline hover:text-indigo-100 transition-colors"
                         disabled={loading}
                     >
