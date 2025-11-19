@@ -1,9 +1,17 @@
-// --- FILNAMN START: src/components/teacher/TeacherSoloShare.jsx ---
 'use client';
-import React from 'react';
-import { BookOpen } from 'lucide-react';
+import React, { useState } from 'react';
+import { BookOpen, Check } from 'lucide-react';
 
 export default function TeacherSoloShare({ session, dispatch }) {
+    const [copied, setCopied] = useState(false);
+    
+    const handleCopy = () => {
+        const url = `https://quizmotorn.se/solo/${session.pin}`;
+        navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
             <div className="max-w-2xl w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-100 text-center">
@@ -11,9 +19,16 @@ export default function TeacherSoloShare({ session, dispatch }) {
                 <h2 className="text-2xl font-bold text-slate-800 mb-4">Redo för självstudier!</h2>
                 <p className="text-slate-500 mb-8">Dela denna länk.</p>
                 <div className="bg-slate-100 p-4 rounded-lg font-mono text-slate-600 break-all border border-slate-200 mb-6 select-all">https://quizmotorn.se/solo/{session.pin}</div>
-                <div className="flex gap-4 justify-center"><button onClick={() => alert("Kopierad!")} className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold">Kopiera Länk</button><button onClick={() => dispatch({ type: 'RESET_APP' })} className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold">Dashboard</button></div>
+                <div className="flex gap-4 justify-center">
+                    <button 
+                        onClick={handleCopy} 
+                        className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold cursor-pointer hover:bg-indigo-500 transition-all flex items-center gap-2"
+                    >
+                        {copied ? <><Check className="w-4 h-4"/> Kopierad!</> : "Kopiera Länk"}
+                    </button>
+                    <button onClick={() => dispatch({ type: 'RESET_APP' })} className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold cursor-pointer hover:bg-slate-50">Dashboard</button>
+                </div>
             </div>
         </div>
     );
 };
-// --- FILNAMN SLUT: src/components/teacher/TeacherSoloShare.jsx ---
