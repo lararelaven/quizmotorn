@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Plus, Bot, Copy, BookOpen, Edit2, Trash2, Smartphone, Grid,
-    Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight
+    Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight, AlertTriangle, Save
 } from 'lucide-react';
 import { AI_PROMPT_TEXT, DEFAULT_QUIZ_JSON } from '../../lib/constants';
 import { generateTeamNames } from '../../lib/utils';
@@ -16,6 +16,9 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [selectedCategory, setSelectedCategory] = useState("Alla");
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
+    
+    // Nytt state för att hantera raderings-popupen
+    const [quizToDelete, setQuizToDelete] = useState(null);
 
     useEffect(() => {
         const fetchQuizzes = async () => {
@@ -84,7 +87,6 @@ export default function TeacherDashboard({ state, dispatch }) {
                 dispatch({ type: 'SAVE_QUIZ', payload: data });
                 setError('');
                 setJsonInput("");
-                // Ingen alert här längre, syns direkt i listan
             }
 
         } catch (e) {
@@ -92,16 +94,27 @@ export default function TeacherDashboard({ state, dispatch }) {
         }
     };
 
-    const handleDeleteQuiz = async (quizId, index) => {
-        // Tog bort confirm-rutan för snabbare flöde
-        if (quizId) {
-            const { error } = await supabase.from('quizzes').delete().eq('id', quizId);
+    // Initiera radering (öppna popup)
+    const initiateDelete = (quizId, index) => {
+        setQuizToDelete({ id: quizId, index: index });
+    };
+
+    // Bekräfta radering (utförs när man klickar "Ja" i popupen)
+    const confirmDelete = async () => {
+        if (!quizToDelete) return;
+
+        const { id, index } = quizToDelete;
+
+        if (id) {
+            const { error } = await supabase.from('quizzes').delete().eq('id', id);
             if (error) {
                 setError("Kunde inte ta bort: " + error.message);
+                setQuizToDelete(null);
                 return;
             }
         }
         dispatch({ type: 'DELETE_QUIZ', payload: index });
+        setQuizToDelete(null); // Stäng popup
     };
 
     const handleCopyPrompt = () => {
@@ -187,7 +200,15 @@ export default function TeacherDashboard({ state, dispatch }) {
                                 placeholder={DEFAULT_QUIZ_JSON}
                             />
                             {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
-                            <button onClick={handleSaveQuiz} className="w-full py-2 bg-white text-slate-900 hover:bg-indigo-50 rounded-xl font-bold text-sm shadow-lg transition-all cursor-pointer">Spara till Bibliotek</button>
+                            
+                            {/* NY SNYGGARE KNAPP */}
+                            <button 
+                                onClick={handleSaveQuiz} 
+                                className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/10 group"
+                            >
+                                <Save className="w-4 h-4 group-hover:scale-110 transition-transform" /> Spara till Bibliotek
+                            </button>
+
                         </div>
                     </div>
                 </section>
@@ -231,7 +252,9 @@ export default function TeacherDashboard({ state, dispatch }) {
                                                 </div>
                                                 <div className="flex gap-1">
                                                     <button onClick={() => dispatch({ type: 'START_EDITING_QUIZ', payload: idx })} className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Redigera"><Edit2 className="w-4 h-4" /></button>
-                                                    <button onClick={() => handleDeleteQuiz(quiz.id, idx)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Radera"><Trash2 className="w-4 h-4" /></button>
+                                                    
+                                                    {/* RADERA-KNAPP SOM NU ÖPPNAR POPUP */}
+                                                    <button onClick={() => initiateDelete(quiz.id, idx)} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors cursor-pointer" title="Radera"><Trash2 className="w-4 h-4" /></button>
                                                 </div>
                                             </div>
                                         </div>
@@ -248,6 +271,38 @@ export default function TeacherDashboard({ state, dispatch }) {
                 </section>
             </main>
 
+            {/* --- POPUP MODALS --- */}
+
+            {/* BEKRÄFTA RADERING MODAL (NY) */}
+            {quizToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl shadow-2xl max-w-sm w-full text-center transform transition-all scale-100">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 ring-1 ring-red-500/20">
+                            <AlertTriangle className="w-8 h-8" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-2">Är du säker?</h3>
+                        <p className="text-slate-400 mb-6 text-sm">
+                            Du är på väg att radera detta quiz permanent. Detta går inte att ångra.
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setQuizToDelete(null)} 
+                                className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-colors cursor-pointer border border-white/5"
+                            >
+                                Avbryt
+                            </button>
+                            <button 
+                                onClick={confirmDelete} 
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all cursor-pointer"
+                            >
+                                Radera
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CATEGORY MANAGER MODAL */}
             {showCategoryManager && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/10 animate-fade-in">
@@ -279,6 +334,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                 </div>
             )}
 
+            {/* JEOPARDY MODAL */}
             {jeopardyConfig && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
                     <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
