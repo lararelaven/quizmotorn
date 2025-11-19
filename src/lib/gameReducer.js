@@ -120,6 +120,22 @@ export const gameReducer = (state, action) => {
                     else questionModifiers.push('normal');
                 }
             }
+            case 'STUDENT_JOIN_SESSION': {
+            const { session, player } = action.payload;
+            return {
+                ...state,
+                view: 'student_lobby', // Byt till lobbyvyn
+                session: { // Sätt elevens session-data baserat på det som hämtats
+                    ...state.session,
+                    id: session.id,
+                    pin_code: session.pin_code,
+                    status: session.status,
+                    settings: session.settings,
+                    quizData: session.quiz_snapshot // Nödvändig quiz-metadata
+                },
+                currentPlayer: player // Sätt elevens lokala spelarobjekt
+                };
+            }
 
             return {
                 ...state,
@@ -215,3 +231,4 @@ export const gameReducer = (state, action) => {
         default: return state;
     }
 };
+
