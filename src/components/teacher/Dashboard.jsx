@@ -18,7 +18,6 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [newCategoryName, setNewCategoryName] = useState("");
     const [quizToDelete, setQuizToDelete] = useState(null);
     
-    // Laddnings-state för att starta session
     const [startingSession, setStartingSession] = useState(false);
 
     useEffect(() => {
@@ -143,18 +142,20 @@ export default function TeacherDashboard({ state, dispatch }) {
     const createSessionInDb = async (quiz, gameMode, settings) => {
         setStartingSession(true);
         try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Ingen användare");
+            
             const pinCode = generatePin(); 
 
-            // Tog bort 'creator_id' härifrån eftersom din databas saknar den kolumnen
+            // Uppdaterad payload för att matcha Supabase-schemat (host_id istället för creator_id)
             const { data: sessionData, error } = await supabase
                 .from('sessions')
                 .insert([{
                     quiz_id: quiz.id,
                     pin_code: pinCode,
                     status: 'lobby',
-                    game_mode: gameMode,
-                    settings: settings, 
-                    quiz_snapshot: quiz 
+                    settings: settings,
+                    host_id: user.id // ANVÄNDER host_id FÖR ATT MATCHA DATABASEN
                 }])
                 .select()
                 .single();
@@ -164,7 +165,6 @@ export default function TeacherDashboard({ state, dispatch }) {
             return { sessionData, pinCode };
 
         } catch (err) {
-            // Använd setError istället för alert så det syns snyggt i UI
             setError("Kunde inte starta session: " + err.message);
             return null;
         } finally {
@@ -180,11 +180,11 @@ export default function TeacherDashboard({ state, dispatch }) {
         if (!jeopardyConfig) return;
         const settings = { gameMode: 'jeopardy', jeopardyTeams: jeopardyConfig.teams, teamNames: jeopardyConfig.teamNames };
         
-        // Körs lokalt utan databas
+        // Körs lokalt utan databas, med dummy-data
         dispatch({ 
             type: 'CREATE_SESSION', 
             payload: { 
-                sessionId: 'local-jeopardy', // Fake ID
+                sessionId: 'local-jeopardy', 
                 pinCode: 'OFFLINE', 
                 quizData: jeopardyConfig.quiz, 
                 settings: settings 
@@ -200,7 +200,7 @@ export default function TeacherDashboard({ state, dispatch }) {
 
         // Skapa i DB
         const result = await createSessionInDb(liveConfig.quiz, 'live', settings);
-        if (!result) return; // Avbryt om fel uppstod
+        if (!result) return; 
 
         dispatch({ 
             type: 'CREATE_SESSION', 
@@ -271,7 +271,6 @@ export default function TeacherDashboard({ state, dispatch }) {
                                     className="w-full h-32 font-mono text-[10px] p-3 bg-slate-950/50 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2 placeholder-white/20 scrollbar-hide resize-none"
                                     placeholder={DEFAULT_QUIZ_JSON}
                                 />
-                                {/* Visa felmeddelanden här om sessionen misslyckas starta */}
                                 {error && <p className="text-red-400 text-xs mb-2 bg-red-500/10 p-2 rounded border border-red-500/20">{error}</p>}
                             </div>
                             
