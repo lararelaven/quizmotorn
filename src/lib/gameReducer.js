@@ -43,15 +43,23 @@ export const gameReducer = (state, action) => {
         case 'DELETE_CATEGORY':
             return { ...state, categories: state.categories.filter(c => c !== action.payload) };
         case 'SAVE_QUIZ': {
-            const newImportedQuiz = { ...action.payload, id: Date.now() };
-            if (!newImportedQuiz.category) newImportedQuiz.category = "Allmänt";
+    // ÄNDRA DENNA RAD:
+    // Gammal kod: const newImportedQuiz = { ...action.payload, id: Date.now() };
+    
+    // Ny kod: Använd ID från payload (UUID från Supabase) om det finns, annars fallback till timestamp
+    const newImportedQuiz = { 
+        ...action.payload, 
+        id: action.payload.id || Date.now() 
+    };
 
-            let updatedCats = state.categories;
-            if (!state.categories.includes(newImportedQuiz.category)) {
-                updatedCats = [...state.categories, newImportedQuiz.category];
-            }
-            return { ...state, savedQuizzes: [...state.savedQuizzes, newImportedQuiz], categories: updatedCats };
-        }
+    if (!newImportedQuiz.category) newImportedQuiz.category = "Allmänt";
+
+    let updatedCats = state.categories;
+    if (!state.categories.includes(newImportedQuiz.category)) {
+        updatedCats = [...state.categories, newImportedQuiz.category];
+    }
+    return { ...state, savedQuizzes: [...state.savedQuizzes, newImportedQuiz], categories: updatedCats };
+}
         case 'DELETE_QUIZ':
             return { ...state, savedQuizzes: state.savedQuizzes.filter((_, i) => i !== action.payload) };
         case 'START_EDITING_QUIZ':
@@ -237,4 +245,5 @@ export const gameReducer = (state, action) => {
         case 'LOGOUT': return initialState;
         default: return state;
     }
+
 };
