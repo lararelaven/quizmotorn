@@ -41,7 +41,7 @@ Strukturen måste vara strikt enligt följande format:
     {
       "question": "Frågetext?",
       "options": ["Alt 1", "Alt 2", "Alt 3", "Alt 4"],
-      "correctAnswerIndex": ,
+      "correctAnswerIndex": 0,
       "explanation": "Kort förklaring."
     }
   ]
@@ -66,4 +66,5 @@ export const DEFAULT_QUIZ_JSON = JSON.stringify({
             explanation: "'color' styr textens färg i CSS, medan 'background-color' styr bakgrunden."
         }
     ]
+
 }, null, 2);
