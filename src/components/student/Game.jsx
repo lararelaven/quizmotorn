@@ -150,7 +150,7 @@ export default function StudentGame({ session, player, dispatch }) {
             <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full">
                 <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                <div className="grid grid-cols-2 gap-4 w-full">
                     {question.options.map((opt, idx) => (
                         <button
                             key={idx}

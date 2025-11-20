@@ -59,10 +59,69 @@ export default function Home() {
         });
       } else if (event === 'SIGNED_OUT') {
         dispatch({ type: 'SET_VIEW', payload: 'landing' });
+        localStorage.removeItem('teacher_session_id');
       }
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // --- NYTT: Spara session vid ändring ---
+  useEffect(() => {
+    if (state.session?.id && ['teacher_lobby', 'teacher_game'].includes(state.view)) {
+      localStorage.setItem('teacher_session_id', state.session.id);
+    }
+  }, [state.session?.id, state.view]);
+
+  // --- NYTT: Återställ session vid refresh ---
+  useEffect(() => {
+    const restoreSession = async () => {
+      const savedSessionId = localStorage.getItem('teacher_session_id');
+      if (!savedSessionId || state.session.id) return; // Redan laddat eller inget att ladda
+
+      console.log("Försöker återställa session:", savedSessionId);
+
+      const { data: sessionData, error } = await supabase
+        .from('sessions')
+        .select('*, quiz:quiz_id(*)') // Hämta även quiz-data!
+        .eq('id', savedSessionId)
+        .single();
+
+      if (error || !sessionData) {
+        console.error("Kunde inte återställa session:", error);
+        localStorage.removeItem('teacher_session_id');
+        return;
+      }
+
+      // Mappa quiz-data korrekt (samma logik som i StudentLogin)
+      // Prioritera snapshot i settings, sen quiz_snapshot, sen joinad quiz
+      const quizData = sessionData.settings?.quizDataSnapshot || sessionData.quiz_snapshot || sessionData.quiz;
+
+      if (!quizData) {
+        console.error("Ingen quizdata hittades för sessionen");
+        return;
+      }
+
+      const fullSession = {
+        ...sessionData,
+        quizData: quizData
+      };
+
+      // Bestäm vilken vy vi ska till baserat på status
+      let targetView = 'teacher_lobby';
+      if (sessionData.status === 'active') targetView = 'teacher_game';
+      if (sessionData.status === 'finished') targetView = 'teacher_dashboard';
+
+      dispatch({
+        type: 'RESTORE_TEACHER_SESSION',
+        payload: {
+          session: fullSession,
+          view: targetView
+        }
+      });
+    };
+
+    restoreSession();
   }, []);
 
   const renderView = () => {

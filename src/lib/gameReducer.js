@@ -38,6 +38,12 @@ export const gameReducer = (state, action) => {
     switch (action.type) {
         case 'LOGIN_TEACHER':
             return { ...state, view: 'teacher_dashboard', user: action.payload };
+        case 'RESTORE_TEACHER_SESSION':
+            return {
+                ...state,
+                view: action.payload.view,
+                session: action.payload.session
+            };
         case 'SET_QUIZZES': {
             const loadedQuizzes = action.payload;
             const existingCategories = new Set(state.categories);
