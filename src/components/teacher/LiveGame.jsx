@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     UserCheck, StopCircle, Monitor, Play, ArrowRight, Trophy, Maximize2, X
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase'; // <-- VIKTIGT: Importera Supabase
+import { supabase } from '@/lib/supabase';
 
 export default function TeacherLiveGame({ session, dispatch }) {
     const question = session.quizData.questions[session.currentQuestionIndex];
@@ -16,7 +16,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     // Nytt state för att räkna svar i realtid
     const [answersCount, setAnswersCount] = useState(0);
-    const totalPlayers = session.players?.length || 0; // Fallback om players är undefined
+    const totalPlayers = session.players?.length || 0;
 
     const scrollRef = useRef(null);
 
@@ -33,8 +33,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
                 (payload) => {
-                    // Enkelt sätt: När en elev uppdateras (svarar), öka räknaren.
-                    // För mer precision kan man kolla payload.new.answers
                     setAnswersCount(prev => prev + 1);
                 }
             )
@@ -105,7 +103,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 <Trophy className="w-24 h-24 text-yellow-400 mb-6" />
                 <h1 className="text-6xl font-black mb-12">Resultat</h1>
                 <div className="w-full max-w-2xl space-y-4">
-                    {/* Vi använder session.players om den finns, annars tom lista */}
                     {[...(session.players || [])].sort((a, b) => b.score - a.score).slice(0, 5).map((p, i) => (
                         <div key={p.id} className="flex justify-between items-center bg-white/10 p-6 rounded-xl border border-white/20">
                             <div className="flex items-center gap-4">
@@ -121,7 +118,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
         );
     }
 
-    // Skydd om quizData saknas eller index är fel
     if (!question) return <div className="text-white p-10">Laddar fråga...</div>;
 
     return (
@@ -193,13 +189,13 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 </div>
             </div>
 
-            <div className="p-6 pt-4 flex justify-end bg-slate-900 flex-shrink-0 z-50 border-t border-white/5 fixed bottom-0 w-full">
+            <div className="fixed bottom-8 right-8 z-50">
                 {!showAnswer ? (
-                    <button onClick={() => setShowAnswer(true)} className="px-8 py-4 rounded-xl font-bold text-xl shadow-lg bg-white text-indigo-900 hover:bg-indigo-50 hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
+                    <button onClick={() => setShowAnswer(true)} className="px-8 py-4 rounded-xl font-bold text-xl shadow-2xl bg-white text-indigo-900 hover:bg-indigo-50 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 border-4 border-indigo-100">
                         <Play className="w-5 h-5" /> Rätta Nu / Visa Svar
                     </button>
                 ) : (
-                    <button onClick={handleNextQuestion} className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-xl hover:bg-indigo-500 shadow-lg flex items-center gap-2 transition-all">
+                    <button onClick={handleNextQuestion} className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-xl hover:bg-indigo-500 hover:scale-105 shadow-2xl flex items-center gap-2 transition-all border-4 border-indigo-400/50">
                         Nästa <ArrowRight />
                     </button>
                 )}
@@ -226,4 +222,4 @@ export default function TeacherLiveGame({ session, dispatch }) {
             )}
         </div>
     );
-};
+}
