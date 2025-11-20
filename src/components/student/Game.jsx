@@ -156,24 +156,7 @@ export default function StudentGame({ session, player, dispatch }) {
                             key={idx}
                             onClick={() => handleAnswer(idx)}
                             disabled={isSending}
-                            className={`
-                                relative overflow-hidden rounded-2xl p-1 transition-all duration-200
-                                ${isSending && selectedOption !== idx ? 'opacity-50 grayscale' : 'hover:scale-[1.02] active:scale-95'}
-                                bg-slate-800
-                            `}
-                        >
-                            <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-6 flex items-center gap-4 relative z-10 text-left">
-                                <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-lg font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
-                                    {letters[idx]}
-                                </div>
-                                <span className="text-lg font-bold text-white leading-tight">{opt}</span>
-                            </div>
-                            {/* Border gradient background */}
-                            <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
-                        </button>
-                    ))}
-                </div>
             </div>
-        </div>
-    );
+            </div>
+            );
 }

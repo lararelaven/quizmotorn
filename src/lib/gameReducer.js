@@ -255,6 +255,11 @@ export const gameReducer = (state, action) => {
         }
         case 'SET_VIEW': return { ...state, view: action.payload };
         case 'SET_CURRENT_PLAYER': return { ...state, currentPlayer: action.payload };
+        case 'UPDATE_PLAYER_SCORE':
+            return {
+                ...state,
+                currentPlayer: { ...state.currentPlayer, score: action.payload }
+            };
         case 'RESET_APP': return { ...state, view: 'teacher_dashboard', session: initialState.session };
         case 'LOGOUT': return initialState;
         default: return state;
