@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Loader2, Trophy, Frown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -18,12 +18,34 @@ export default function StudentGame({ session, player, dispatch }) {
     const [isSending, setIsSending] = useState(false);
 
     // Om läraren uppdaterat index, återställ state (ny fråga)
-    // (Enklast att hantera med key={questionIndex} i render, eller en useEffect)
-    React.useEffect(() => {
+    useEffect(() => {
         setHasAnswered(false);
         setSelectedOption(null);
         setIsSending(false);
     }, [questionIndex]);
+
+    // Lyssna på uppdateringar av sessionen (t.ex. nästa fråga)
+    useEffect(() => {
+        const channel = supabase
+            .channel(`student_game_${session.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'sessions',
+                    filter: `id=eq.${session.id}`,
+                },
+                (payload) => {
+                    dispatch({ type: 'UPDATE_SESSION', payload: payload.new });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [session.id, dispatch]);
 
     const handleAnswer = async (optionIndex) => {
         if (hasAnswered || isSending) return;
