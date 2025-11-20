@@ -32,6 +32,33 @@ export default function StudentLogin({ dispatch }) {
                 .eq('pin_code', pin)
                 .single();
 
+            console.log('StudentLogin: Fetched session:', session);
+
+            // Fallback: Om quiz-data saknas (t.ex. pga RLS på join), försök hämta direkt eller använd snapshot
+            if (!session.quiz && !session.quiz_snapshot) {
+                console.warn('StudentLogin: Quiz data missing in join. Attempting direct fetch...');
+                const { data: directQuiz, error: directError } = await supabase
+                    .from('quizzes')
+                    .select('*')
+                    .eq('id', session.quiz_id)
+                    .single();
+
+                if (directQuiz) {
+                    console.log('StudentLogin: Direct fetch successful.');
+                    session.quiz = directQuiz;
+                } else {
+                    console.error('StudentLogin: Direct fetch failed:', directError);
+                }
+            }
+
+            if (session.quiz) {
+                console.log('StudentLogin: Quiz data available:', session.quiz);
+            } else if (session.quiz_snapshot) {
+                console.log('StudentLogin: Using quiz snapshot.');
+            } else {
+                console.error('StudentLogin: CRITICAL - No quiz data found anywhere!');
+            }
+
             if (sessionError || !session) {
                 throw new Error("Hittade ingen session med den koden. Kontrollera koden.");
             }
