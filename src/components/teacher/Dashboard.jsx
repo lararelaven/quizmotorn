@@ -154,9 +154,8 @@ export default function TeacherDashboard({ state, dispatch }) {
                     quiz_id: quiz.id,
                     pin_code: pinCode,
                     status: 'lobby',
-                    settings: settings,
-                    host_id: user.id, // ANVÄNDER host_id FÖR ATT MATCHA DATABASEN
-                    quiz_snapshot: quiz // SPARA QUIZ-DATA SOM SNAPSHOT FÖR ATT UNDVIKA RLS-PROBLEM FÖR ELEVER
+                    settings: { ...settings, quizDataSnapshot: quiz }, // Hack: Spara quiz-data i settings
+                    host_id: user.id
                 }])
                 .select()
                 .single();

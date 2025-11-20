@@ -153,7 +153,7 @@ export const gameReducer = (state, action) => {
                     pin_code: session.pin_code,
                     status: session.status,
                     settings: session.settings,
-                    quizData: session.quiz_snapshot || session.quiz // Använd snapshot om det finns, annars joinad quiz-data
+                    quizData: session.quiz_snapshot || session.settings?.quizDataSnapshot || session.quiz // Använd snapshot (kolumn eller settings) om det finns
                 },
                 currentPlayer: player // Sätt elevens lokala spelarobjekt
             };
