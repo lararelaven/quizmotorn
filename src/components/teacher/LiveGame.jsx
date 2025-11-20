@@ -16,11 +16,12 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     // Nytt state för att räkna svar i realtid
     const [answersCount, setAnswersCount] = useState(0);
+    const [topPlayers, setTopPlayers] = useState([]);
     const totalPlayers = session.players?.length || 0;
 
     const scrollRef = useRef(null);
 
-    // --- NYTT: Lyssna på inkommande svar ---
+    // --- NYTT: Lyssna på inkommande svar OCH poänguppdateringar (för leaderboard) ---
     useEffect(() => {
         if (!session.id) return;
 
@@ -33,13 +34,32 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
                 (payload) => {
-                    setAnswersCount(prev => prev + 1);
+                    // Uppdatera antal svar
+                    if (payload.new.answers && payload.new.answers[session.currentQuestionIndex] !== undefined) {
+                        setAnswersCount(prev => prev + 1);
+                    }
+                    // Uppdatera leaderboard om poäng ändras
+                    if (payload.new.score !== payload.old.score) {
+                        fetchTopPlayers();
+                    }
                 }
             )
             .subscribe();
 
+        fetchTopPlayers(); // Hämta initialt
+
         return () => supabase.removeChannel(channel);
     }, [session.currentQuestionIndex, session.id]);
+
+    const fetchTopPlayers = async () => {
+        const { data } = await supabase
+            .from('players')
+            .select('name, score')
+            .eq('session_id', session.id)
+            .order('score', { ascending: false })
+            .limit(3);
+        if (data) setTopPlayers(data);
+    };
     // ---------------------------------------
 
     // --- NYTT: Databas-funktioner ---
@@ -53,7 +73,21 @@ export default function TeacherLiveGame({ session, dispatch }) {
         const nextIndex = session.currentQuestionIndex + 1;
         await supabase
             .from('sessions')
-            .update({ current_question_index: nextIndex })
+            .update({
+                current_question_index: nextIndex,
+                settings: { ...session.settings, showAnswer: false } // Göm svar för elever
+            })
+            .eq('id', session.id);
+    };
+
+    const handleShowAnswer = async () => {
+        setShowAnswer(true);
+        // Visa svar för elever
+        await supabase
+            .from('sessions')
+            .update({
+                settings: { ...session.settings, showAnswer: true }
+            })
             .eq('id', session.id);
     };
 
@@ -67,7 +101,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     useEffect(() => {
         if (!session.settings.timerEnabled || showAnswer || isFinished || timeLeft === null) return;
         if (timeLeft <= 0) {
-            setShowAnswer(true);
+            handleShowAnswer();
             return;
         }
         const timerId = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
@@ -136,6 +170,20 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     </div>
 
                     <div className="flex gap-4 items-center">
+                        {/* Leaderboard Mini */}
+                        <div className="hidden md:flex items-center gap-3 bg-black/20 px-4 py-2 rounded-xl border border-white/5">
+                            <Trophy className="w-4 h-4 text-yellow-400" />
+                            <div className="flex gap-3 text-xs font-bold">
+                                {topPlayers.map((p, i) => (
+                                    <div key={i} className="flex items-center gap-1">
+                                        <span className="text-slate-400">#{i + 1}</span>
+                                        <span className="text-white">{p.name}</span>
+                                        <span className="text-indigo-300">{p.score}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         <button onClick={() => setShowExitConfirm(true)} className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 transition-colors font-bold text-sm"><StopCircle className="w-4 h-4" /> Avsluta</button>
                     </div>
                 </div>
@@ -171,7 +219,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                             return (
                                 <div key={idx} className={`relative overflow-hidden rounded-2xl p-1 transition-all duration-300 ${showAnswer ? (isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600 scale-105 shadow-[0_0_30px_rgba(74,222,128,0.5)]' : 'bg-slate-800 opacity-30 grayscale') : 'bg-slate-800 hover:bg-slate-700 hover:scale-[1.02] cursor-default'}`}>
                                     <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-8 flex items-center gap-6 relative z-10">
-                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>{letters[idx]}</div>
+                                        <div className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>{letters[idx]}</div>
                                         <span className="text-2xl font-bold text-white">{opt}</span>
                                     </div>
                                     {!showAnswer && <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />}
@@ -191,7 +239,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
             <div className="fixed bottom-8 right-8 z-50">
                 {!showAnswer ? (
-                    <button onClick={() => setShowAnswer(true)} className="px-8 py-4 rounded-xl font-bold text-xl shadow-2xl bg-white text-indigo-900 hover:bg-indigo-50 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 border-4 border-indigo-100">
+                    <button onClick={handleShowAnswer} className="px-8 py-4 rounded-xl font-bold text-xl shadow-2xl bg-white text-indigo-900 hover:bg-indigo-50 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 border-4 border-indigo-100">
                         <Play className="w-5 h-5" /> Rätta Nu / Visa Svar
                     </button>
                 ) : (

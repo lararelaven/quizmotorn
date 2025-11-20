@@ -1,30 +1,31 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Check, Loader2, Trophy, Frown } from 'lucide-react';
+import { Check, Loader2, Trophy, Frown, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function StudentGame({ session, player, dispatch }) {
     const questionIndex = session?.current_question_index ?? 0;
 
-    // Safety check: Om quizData saknas (kanske inte laddat än)
+    // Safety check
     if (!session?.quizData?.questions) {
         return <div className="text-white text-center p-10">Laddar quizdata...</div>;
     }
 
     const question = session.quizData.questions[questionIndex];
+    const showAnswer = session.settings?.showAnswer || false;
 
     const [hasAnswered, setHasAnswered] = useState(false);
     const [selectedOption, setSelectedOption] = useState(null);
     const [isSending, setIsSending] = useState(false);
 
-    // Om läraren uppdaterat index, återställ state (ny fråga)
+    // Reset state on new question
     useEffect(() => {
         setHasAnswered(false);
         setSelectedOption(null);
         setIsSending(false);
     }, [questionIndex]);
 
-    // Lyssna på uppdateringar av sessionen (t.ex. nästa fråga)
+    // Realtime subscription
     useEffect(() => {
         const channel = supabase
             .channel(`student_game_${session.id}`)
@@ -54,25 +55,18 @@ export default function StudentGame({ session, player, dispatch }) {
         setSelectedOption(optionIndex);
 
         try {
-            // 1. Hämta nuvarande svar
             let currentAnswers = player.answers || {};
-
-            // 2. Lägg till nytt svar
             currentAnswers[questionIndex] = optionIndex;
 
-            // 3. Beräkna poäng (om vi vill göra det direkt här)
             const isCorrect = optionIndex === question.correctAnswerIndex;
             const points = isCorrect ? (session.settings.scoreMode === 'speed' ? 1000 : 100) : 0;
-            // (Obs: I en riktig app görs poängräkning säkrast på servern eller i en Postgres Function, men detta duger för nu)
             const newScore = (player.score || 0) + points;
 
-            // 4. Skicka till DB
             const { error } = await supabase
                 .from('players')
                 .update({
                     answers: currentAnswers,
                     score: newScore
-                    // Vi kan lägga till 'last_answered_index': questionIndex för bättre sync
                 })
                 .eq('id', player.id);
 
@@ -83,67 +77,102 @@ export default function StudentGame({ session, player, dispatch }) {
 
         } catch (err) {
             console.error("Kunde inte spara svar:", err);
-            setIsSending(false); // Låt dem försöka igen
+            setIsSending(false);
         }
     };
 
-    // FÄRGER & UI
-    const colors = [
-        'bg-pink-500 hover:bg-pink-600 border-pink-700',
-        'bg-blue-500 hover:bg-blue-600 border-blue-700',
-        'bg-yellow-500 hover:bg-yellow-600 border-yellow-700',
-        'bg-purple-500 hover:bg-purple-600 border-purple-700'
-    ];
     const letters = ['A', 'B', 'C', 'D'];
+    const gradients = ['from-pink-500 to-rose-600', 'from-blue-500 to-cyan-600', 'from-yellow-400 to-orange-500', 'from-purple-500 to-indigo-600'];
 
     if (!question) return <div className="text-white text-center p-10">Laddar fråga...</div>;
 
-    if (hasAnswered) {
+    // --- RESULT VIEW (Teacher clicked "Rätta Nu") ---
+    if (showAnswer && hasAnswered) {
+        const isCorrect = selectedOption === question.correctAnswerIndex;
         return (
-            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-6 animate-fade-in">
-                <div className="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center border-4 border-indigo-500 shadow-xl">
-                    <Check className="w-12 h-12 text-indigo-400" />
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
+                <div className={`w-32 h-32 rounded-full flex items-center justify-center border-8 shadow-2xl ${isCorrect ? 'bg-green-500/20 border-green-500' : 'bg-red-500/20 border-red-500'}`}>
+                    {isCorrect ? <Check className="w-16 h-16 text-green-500" /> : <X className="w-16 h-16 text-red-500" />}
                 </div>
-                <h1 className="text-3xl font-black">Svar skickat!</h1>
-                <p className="text-slate-400 text-lg">Vänta på resultatet...</p>
-                <div className="flex gap-2 items-center bg-black/30 px-4 py-2 rounded-lg">
+
+                <div>
+                    <h1 className="text-4xl font-black mb-2">{isCorrect ? 'Rätt svar!' : 'Tyvärr, fel svar.'}</h1>
+                    <p className="text-slate-400 text-xl">
+                        {isCorrect ? `+${session.settings.scoreMode === 'speed' ? 1000 : 100} poäng` : 'Inga poäng denna gång'}
+                    </p>
+                </div>
+
+                <div className="bg-slate-800 px-6 py-4 rounded-xl border border-slate-700">
+                    <span className="text-slate-400 uppercase text-xs font-bold tracking-wider">Din totala poäng</span>
+                    <div className="text-3xl font-black text-white">{player.score || 0}</div>
+                </div>
+
+                <div className="flex gap-2 items-center bg-black/30 px-4 py-2 rounded-lg mt-8">
                     <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                    <span className="text-sm font-mono">Synkar med läraren</span>
+                    <span className="text-sm font-mono text-indigo-300">Väntar på nästa fråga...</span>
                 </div>
             </div>
         );
     }
 
+    // --- WAITING VIEW (Answered, but teacher hasn't revealed yet) ---
+    if (hasAnswered) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
+                <div className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[selectedOption % 4]}`}>
+                    {letters[selectedOption]}
+                </div>
+
+                <div>
+                    <h1 className="text-3xl font-black mb-2">Du svarade {letters[selectedOption]}</h1>
+                    <p className="text-slate-400 text-lg">Vänta på resultatet...</p>
+                </div>
+
+                <div className="flex gap-2 items-center bg-black/30 px-4 py-2 rounded-lg">
+                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                    <span className="text-sm font-mono text-indigo-300">Synkar med läraren</span>
+                </div>
+            </div>
+        );
+    }
+
+    // --- QUESTION VIEW (Answering) ---
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col p-4">
             <div className="flex justify-between items-center mb-6 text-slate-400 font-bold font-mono text-sm">
                 <span>FRÅGA {questionIndex + 1}</span>
-                <span>{player.name}</span>
+                <div className="flex flex-col items-end">
+                    <span className="text-white">{player.name}</span>
+                    <span className="text-xs text-indigo-400">{player.score || 0} p</span>
+                </div>
             </div>
 
-            <div className="flex-1 flex flex-col justify-center gap-4 max-w-md mx-auto w-full">
-                {question.options.map((opt, idx) => (
-                    <button
-                        key={idx}
-                        onClick={() => handleAnswer(idx)}
-                        disabled={isSending}
-                        className={`
-                            relative overflow-hidden w-full p-6 rounded-2xl 
-                            text-left transition-all transform active:scale-95 
-                            shadow-lg border-b-4 ${colors[idx % 4]}
-                            ${isSending && selectedOption !== idx ? 'opacity-50' : ''}
-                        `}
-                    >
-                        <div className="flex items-center gap-4 relative z-10">
-                            <div className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center font-black text-xl">
-                                {letters[idx]}
+            <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full">
+                <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                    {question.options.map((opt, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => handleAnswer(idx)}
+                            disabled={isSending}
+                            className={`
+                                relative overflow-hidden rounded-2xl p-1 transition-all duration-200
+                                ${isSending && selectedOption !== idx ? 'opacity-50 grayscale' : 'hover:scale-[1.02] active:scale-95'}
+                                bg-slate-800
+                            `}
+                        >
+                            <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-6 flex items-center gap-4 relative z-10 text-left">
+                                <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-lg font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
+                                    {letters[idx]}
+                                </div>
+                                <span className="text-lg font-bold text-white leading-tight">{opt}</span>
                             </div>
-                            <span className="text-2xl font-bold leading-tight">{opt}</span>
-                        </div>
-                        {/* Shine effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 skew-x-12 opacity-0 hover:opacity-100 transition-opacity" />
-                    </button>
-                ))}
+                            {/* Border gradient background */}
+                            <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+                        </button>
+                    ))}
+                </div>
             </div>
         </div>
     );
