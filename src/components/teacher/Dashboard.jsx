@@ -17,7 +17,7 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
     const [quizToDelete, setQuizToDelete] = useState(null);
-    
+
     const [startingSession, setStartingSession] = useState(false);
 
     useEffect(() => {
@@ -144,8 +144,8 @@ export default function TeacherDashboard({ state, dispatch }) {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("Ingen användare");
-            
-            const pinCode = generatePin(); 
+
+            const pinCode = generatePin();
 
             // Uppdaterad payload för att matcha Supabase-schemat (host_id istället för creator_id)
             const { data: sessionData, error } = await supabase
@@ -155,7 +155,8 @@ export default function TeacherDashboard({ state, dispatch }) {
                     pin_code: pinCode,
                     status: 'lobby',
                     settings: settings,
-                    host_id: user.id // ANVÄNDER host_id FÖR ATT MATCHA DATABASEN
+                    host_id: user.id, // ANVÄNDER host_id FÖR ATT MATCHA DATABASEN
+                    quiz_snapshot: quiz // SPARA QUIZ-DATA SOM SNAPSHOT FÖR ATT UNDVIKA RLS-PROBLEM FÖR ELEVER
                 }])
                 .select()
                 .single();
@@ -179,16 +180,16 @@ export default function TeacherDashboard({ state, dispatch }) {
     const startJeopardy = () => {
         if (!jeopardyConfig) return;
         const settings = { gameMode: 'jeopardy', jeopardyTeams: jeopardyConfig.teams, teamNames: jeopardyConfig.teamNames };
-        
+
         // Körs lokalt utan databas, med dummy-data
-        dispatch({ 
-            type: 'CREATE_SESSION', 
-            payload: { 
-                sessionId: 'local-jeopardy', 
-                pinCode: 'OFFLINE', 
-                quizData: jeopardyConfig.quiz, 
-                settings: settings 
-            } 
+        dispatch({
+            type: 'CREATE_SESSION',
+            payload: {
+                sessionId: 'local-jeopardy',
+                pinCode: 'OFFLINE',
+                quizData: jeopardyConfig.quiz,
+                settings: settings
+            }
         });
         setJeopardyConfig(null);
     };
@@ -200,16 +201,16 @@ export default function TeacherDashboard({ state, dispatch }) {
 
         // Skapa i DB
         const result = await createSessionInDb(liveConfig.quiz, 'live', settings);
-        if (!result) return; 
+        if (!result) return;
 
-        dispatch({ 
-            type: 'CREATE_SESSION', 
-            payload: { 
+        dispatch({
+            type: 'CREATE_SESSION',
+            payload: {
                 sessionId: result.sessionData.id,
                 pinCode: result.pinCode,
-                quizData: liveConfig.quiz, 
-                settings: settings 
-            } 
+                quizData: liveConfig.quiz,
+                settings: settings
+            }
         });
         setLiveConfig(null);
     }
@@ -241,8 +242,8 @@ export default function TeacherDashboard({ state, dispatch }) {
                 <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 hover:bg-red-500/20 px-3 py-2 rounded-lg transition-colors font-medium cursor-pointer"><LogOut className="w-4 h-4" /> Logga ut</button>
             </header>
             <main className="max-w-6xl mx-auto p-6 space-y-12">
-                
-                 <section>
+
+                <section>
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Plus className="w-6 h-6 text-indigo-400" /> Skapa / Importera</h2>
                         <button
@@ -273,9 +274,9 @@ export default function TeacherDashboard({ state, dispatch }) {
                                 />
                                 {error && <p className="text-red-400 text-xs mb-2 bg-red-500/10 p-2 rounded border border-red-500/20">{error}</p>}
                             </div>
-                            
-                            <button 
-                                onClick={handleSaveQuiz} 
+
+                            <button
+                                onClick={handleSaveQuiz}
                                 className="mt-0 w-full py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg hover:shadow-emerald-500/20 hover:scale-[1.02] flex items-center justify-center gap-2 text-xs transition-all border border-white/5 cursor-pointer shadow-lg"
                             >
                                 <Save className="w-3 h-3" /> Spara till Bibliotek
