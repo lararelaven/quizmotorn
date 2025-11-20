@@ -41,7 +41,7 @@ export default function StudentLobby({ currentPlayer, dispatch }) {
                 <div className="absolute bottom-10 right-10 w-64 h-64 bg-purple-500 rounded-full mix-blend-overlay filter blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
             </div>
 
-            <div className="z-10 text-center space-y-8 animate-float-up">
+            <div className="z-10 text-center space-y-8 animate-fade-in">
                 <div className="w-24 h-24 bg-white/20 backdrop-blur-lg rounded-full flex items-center justify-center mx-auto shadow-2xl border border-white/10">
                     <User className="w-12 h-12 text-white" />
                 </div>

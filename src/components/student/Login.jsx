@@ -4,10 +4,16 @@
 import React, { useState } from 'react';
 import { Shuffle, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { generateRandomName } from '../../lib/utils'; 
+import { generateRandomName } from '../../lib/utils';
 
 export default function StudentLogin({ dispatch }) {
-    const [pin, setPin] = useState('');
+    const [pin, setPin] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('pin') || '';
+        }
+        return '';
+    });
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
