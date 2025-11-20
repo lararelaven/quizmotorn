@@ -168,6 +168,17 @@ export const gameReducer = (state, action) => {
                     players: [...state.session.players, { ...action.payload, lastAnsweredQuestionIndex: -1 }]
                 }
             };
+        case 'STUDENT_START_GAME':
+            return {
+                ...state,
+                view: 'student_game',
+                session: {
+                    ...state.session,
+                    status: 'active',
+                    currentQuestionIndex: 0,
+                    questionStartTime: Date.now()
+                }
+            };
         case 'START_GAME':
             return {
                 ...state,

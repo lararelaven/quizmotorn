@@ -24,7 +24,7 @@ export default function TeacherLobby({ session, dispatch }) {
         fetchExistingPlayers();
 
         const channel = supabase
-            .channel('lobby_players')
+            .channel(`lobby_players_${session.id}`)
             .on(
                 'postgres_changes',
                 {

@@ -22,7 +22,7 @@ export default function StudentLobby({ currentPlayer, dispatch }) {
                 (payload) => {
                     if (payload.new.status === 'active') {
                         // Startskottet har gått!
-                        dispatch({ type: 'START_GAME', payload: payload.new });
+                        dispatch({ type: 'STUDENT_START_GAME', payload: payload.new });
                     }
                 }
             )
