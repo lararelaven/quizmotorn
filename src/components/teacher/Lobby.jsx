@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 export default function TeacherLobby({ session, dispatch }) {
     const [copied, setCopied] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState('CONNECTING'); // CONNECTING, SUBSCRIBED, ERROR
 
     useEffect(() => {
         if (!session?.id) return;
@@ -34,10 +35,14 @@ export default function TeacherLobby({ session, dispatch }) {
                     filter: `session_id=eq.${session.id}`,
                 },
                 (payload) => {
+                    console.log('Received player insert:', payload);
                     dispatch({ type: 'ADD_PLAYER', payload: payload.new });
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log('Subscription status:', status);
+                setConnectionStatus(status);
+            });
 
         return () => {
             supabase.removeChannel(channel);
@@ -67,6 +72,11 @@ export default function TeacherLobby({ session, dispatch }) {
 
     return (
         <div className="min-h-screen bg-[#0f172a] text-white flex flex-col relative overflow-hidden font-sans">
+            {/* Debug Status */}
+            <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-mono ${connectionStatus === 'SUBSCRIBED' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                }`}>
+                Realtime: {connectionStatus}
+            </div>
 
             <div className="flex justify-between items-start p-8 z-10">
 

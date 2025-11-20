@@ -1,9 +1,10 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, User, Trophy, Music } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function StudentLobby({ currentPlayer, dispatch }) {
+    const [connectionStatus, setConnectionStatus] = useState('CONNECTING');
 
     useEffect(() => {
         if (!currentPlayer?.session_id) return;
@@ -20,13 +21,17 @@ export default function StudentLobby({ currentPlayer, dispatch }) {
                     filter: `id=eq.${currentPlayer.session_id}`,
                 },
                 (payload) => {
+                    console.log('Student received session update:', payload);
                     if (payload.new.status === 'active') {
                         // Startskottet har gått!
                         dispatch({ type: 'STUDENT_START_GAME', payload: payload.new });
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log('Student subscription status:', status);
+                setConnectionStatus(status);
+            });
 
         return () => {
             supabase.removeChannel(sessionChannel);
@@ -35,6 +40,12 @@ export default function StudentLobby({ currentPlayer, dispatch }) {
 
     return (
         <div className="min-h-screen bg-indigo-600 flex flex-col items-center justify-center p-6 text-white relative overflow-hidden">
+            {/* Debug Status */}
+            <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-mono ${connectionStatus === 'SUBSCRIBED' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                }`}>
+                Realtime: {connectionStatus}
+            </div>
+
             {/* Animerad bakgrund */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
                 <div className="absolute top-10 left-10 w-32 h-32 bg-white rounded-full mix-blend-overlay filter blur-3xl animate-pulse"></div>
