@@ -4,7 +4,13 @@ import { Check, Loader2, Trophy, Frown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function StudentGame({ session, player, dispatch }) {
-    const questionIndex = session.current_question_index;
+    const questionIndex = session?.current_question_index ?? 0;
+
+    // Safety check: Om quizData saknas (kanske inte laddat än)
+    if (!session?.quizData?.questions) {
+        return <div className="text-white text-center p-10">Laddar quizdata...</div>;
+    }
+
     const question = session.quizData.questions[questionIndex];
 
     const [hasAnswered, setHasAnswered] = useState(false);
