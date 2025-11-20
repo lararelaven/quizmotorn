@@ -1,0 +1,1432 @@
+import React, { useState, useEffect, useReducer, useRef } from 'react';
+import { 
+  Users, Settings, Copy, CheckCircle, XCircle, Trophy, ArrowRight, Monitor, 
+  Smartphone, Shuffle, Grid, Bot, BookOpen, Gamepad2, Edit2, Trash2, Plus, 
+  AlertTriangle, Zap, Star, RotateCw, QrCode, X, StopCircle, Clock, UserCheck, 
+  Play, Image as ImageIcon, Save, ArrowLeft, MinusCircle, Upload, Maximize2, 
+  Heart, Flame, Rocket, ThumbsUp, LogOut, Medal, Mail, Key, Tag, FilePlus,
+  Filter, Layers
+} from 'lucide-react';
+
+// ==================================================================================
+// --- 1. KONSTANTER & DATA ---
+// ==================================================================================
+
+const ADJECTIVES = [
+  'Glad', 'Snabb', 'Lurig', 'Tokig', 'Smart', 'Stark', 'Vild', 'Modig', 'Röd', 'Blå', 
+  'Hoppande', 'Sömnig', 'Listig', 'Pigg', 'Cool', 'Super', 'Mega', 'Ultra', 'Episk',
+  'Galen', 'Brutal', 'Enorm', 'Liten', 'Arg', 'Sur', 'Glansig', 'Digital', 'Analog', 'Koffein', 'Laggande'
+];
+
+const NOUNS = [
+  'Banan', 'Tiger', 'Robot', 'Kaktus', 'Muffin', 'Drake', 'Ninja', 'Pirat', 'Viking', 
+  'Katt', 'Hund', 'Uggla', 'Räv', 'Björn', 'Haj', 'Örn', 'Säl', 'Val', 'Panda',
+  'Zombie', 'Spöke', 'Alien', 'Troll', 'Gurka', 'Potatis', 'Bug', 'Server', 'Pixel', 'Router', 'Skärm'
+];
+
+const FUN_TEAM_NAMES = [
+    "Syntax Error", "Lag Lagg", "Kaffeknarkarna", "Ctrl+Alt+Defeat", "404 Brain Not Found",
+    "De Vilda Vetrarna", "Google Mästrarna", "Quiz-Riddarna", "Den Sista Cellen", "Beta Testarna",
+    "Hårddiskarna", "Pixel Piraterna", "Cyber-Svamparna", "De Analoga", "Zoom-Zombies",
+    "Git Push It", "JavaSipparna", "Python Ormarna", "CSS-Stylisterna", "HTML-Hjältarna",
+    "Data Dårarna", "Skärmsläckarna", "Tangentbordskrigarna", "Wi-Fi Visarna", "Buffrarna",
+    "Binära Björnarna", "Kompilerarna", "Bug Jägarna", "Ram-Minnesmästarna", "Blue Screen Survivors"
+];
+
+const DEFAULT_CATEGORIES = [
+    "Allmänt"
+];
+
+const JEOPARDY_COLORS = [
+  'bg-pink-200 hover:bg-pink-300 text-pink-900',
+  'bg-blue-200 hover:bg-blue-300 text-blue-900',
+  'bg-yellow-200 hover:bg-yellow-300 text-yellow-900',
+  'bg-purple-200 hover:bg-purple-300 text-purple-900',
+  'bg-green-200 hover:bg-green-300 text-green-900',
+  'bg-orange-200 hover:bg-orange-300 text-orange-900'
+];
+
+const AI_PROMPT_TEXT = `Skapa ett JSON-objekt för ett quiz med 15 frågor. 
+Strukturen måste vara strikt enligt följande format:
+
+{
+  "title": "Titel på quizet",
+  "category": "Allmänt", 
+  "questions": [
+    {
+      "question": "Frågetext?",
+      "options": ["Alt 1", "Alt 2", "Alt 3", "Alt 4"],
+      "correctAnswerIndex": 0,
+      "explanation": "Kort förklaring."
+    }
+  ]
+}
+`;
+
+const DEFAULT_QUIZ_JSON = JSON.stringify({
+  title: "Exempel: Webb & Design",
+  category: "Allmänt",
+  questions: [
+    {
+      question: "Vad står HTML för?",
+      options: ["HyperText Markup Language", "HighTech Made Language", "Home Tool Markup Language", "Hyperlinks and Text Markup Language"],
+      correctAnswerIndex: 0,
+      explanation: "HTML är standardspråket för att skapa webbsidor."
+    },
+    {
+      question: "Vilken CSS-egenskap ändrar textfärg?",
+      options: ["text-color", "font-color", "color", "foreground"],
+      correctAnswerIndex: 2,
+      explanation: "'color' styr textens färg i CSS, medan 'background-color' styr bakgrunden."
+    }
+  ]
+}, null, 2);
+
+// ==================================================================================
+// --- 2. HJÄLPFUNKTIONER ---
+// ==================================================================================
+
+const generateRandomName = () => {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  return `${adj} ${noun}`;
+};
+
+const generateTeamNames = (count) => {
+    const shuffled = [...FUN_TEAM_NAMES].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+};
+
+const generatePin = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+// ==================================================================================
+// --- 3. STATE MANAGEMENT (REDUCER) ---
+// ==================================================================================
+
+const initialState = {
+  view: 'landing',
+  user: null,
+  savedQuizzes: [],
+  categories: DEFAULT_CATEGORIES, 
+  editingQuizIndex: null, 
+  session: {
+    pin: null,
+    status: 'idle',
+    currentQuestionIndex: -1,
+    questionStartTime: null, 
+    settings: { 
+      gameMode: 'live', 
+      jeopardyTeams: 3,
+      timerEnabled: false,
+      timerDuration: 30,
+      forceRandomNames: false,
+      scoreMode: 'speed' 
+    },
+    players: [], 
+    lobbyReactions: [], 
+    jeopardyState: { 
+        teams: [], 
+        completedQuestions: [], 
+        questionModifiers: [], 
+        currentTeamTurn: 0 
+    },
+    quizData: null
+  },
+  currentPlayer: null
+};
+
+const gameReducer = (state, action) => {
+  switch (action.type) {
+    case 'LOGIN_TEACHER':
+        return { ...state, view: 'teacher_dashboard', user: action.payload };
+    case 'ADD_CATEGORY':
+        if (state.categories.includes(action.payload)) return state;
+        return { ...state, categories: [...state.categories, action.payload] };
+    case 'DELETE_CATEGORY':
+        return { ...state, categories: state.categories.filter(c => c !== action.payload) };
+    case 'SAVE_QUIZ': {
+        const newImportedQuiz = { ...action.payload, id: Date.now() };
+        // Ensure category defaults to "Allmänt" if missing
+        if (!newImportedQuiz.category) newImportedQuiz.category = "Allmänt";
+        
+        // Auto-add category to global list if it doesn't exist
+        let updatedCats = state.categories;
+        if (!state.categories.includes(newImportedQuiz.category)) {
+            updatedCats = [...state.categories, newImportedQuiz.category];
+        }
+        return { ...state, savedQuizzes: [...state.savedQuizzes, newImportedQuiz], categories: updatedCats };
+    }
+    case 'DELETE_QUIZ':
+        return { ...state, savedQuizzes: state.savedQuizzes.filter((_, i) => i !== action.payload) };
+    case 'START_EDITING_QUIZ':
+        return { ...state, view: 'teacher_editor', editingQuizIndex: action.payload };
+    case 'CREATE_EMPTY_QUIZ':
+        return { ...state, view: 'teacher_editor', editingQuizIndex: -1 };
+    case 'SAVE_EDITED_QUIZ': {
+        const updatedQuiz = { ...action.payload };
+        // Ensure category defaults to "Allmänt" if missing
+        if (!updatedQuiz.category) updatedQuiz.category = "Allmänt";
+
+        const updatedQuizzesList = [...state.savedQuizzes];
+        if (state.editingQuizIndex !== null && state.editingQuizIndex >= 0) {
+            updatedQuizzesList[state.editingQuizIndex] = updatedQuiz;
+        } else {
+            updatedQuizzesList.push({ ...updatedQuiz, id: Date.now() });
+        }
+
+        // Auto-add category to global list if it doesn't exist
+        let updatedCatsAfterEdit = state.categories;
+        if (!state.categories.includes(updatedQuiz.category)) {
+            updatedCatsAfterEdit = [...state.categories, updatedQuiz.category];
+        }
+
+        return { 
+            ...state, 
+            savedQuizzes: updatedQuizzesList, 
+            categories: updatedCatsAfterEdit,
+            view: 'teacher_dashboard', 
+            editingQuizIndex: null 
+        };
+    }
+    case 'UPDATE_QUIZ_TITLE': {
+        const { index, newTitle } = action.payload;
+        const quizzesWithUpdatedTitle = [...state.savedQuizzes];
+        quizzesWithUpdatedTitle[index].title = newTitle;
+        return { ...state, savedQuizzes: quizzesWithUpdatedTitle };
+    }
+    case 'CREATE_SESSION': {
+      let jeopardyTeams = [];
+      let questionModifiers = [];
+      
+      if (action.payload.settings.gameMode === 'jeopardy') {
+          const teamNames = action.payload.settings.teamNames || generateTeamNames(action.payload.settings.jeopardyTeams);
+          for(let i=0; i<teamNames.length; i++) {
+              jeopardyTeams.push({ name: teamNames[i], score: 0 });
+          }
+          const qCount = action.payload.quizData.questions.length;
+          for(let i=0; i<qCount; i++) {
+              const rand = Math.random();
+              if (rand < 0.10) questionModifiers.push('gamble');
+              else if (rand < 0.30) questionModifiers.push('double');
+              else questionModifiers.push('normal');
+          }
+      }
+
+      return {
+        ...state,
+        view: action.payload.settings.gameMode === 'solo' ? 'teacher_solo_share' : 
+              (action.payload.settings.gameMode === 'jeopardy' ? 'teacher_game' : 'teacher_lobby'),
+        session: {
+          ...state.session,
+          pin: generatePin(),
+          status: 'lobby',
+          quizData: action.payload.quizData,
+          settings: { ...state.session.settings, ...action.payload.settings },
+          players: [],
+          lobbyReactions: [],
+          jeopardyState: {
+              teams: jeopardyTeams,
+              completedQuestions: [],
+              questionModifiers: questionModifiers,
+              currentTeamTurn: 0
+          }
+        }
+      };
+    }
+    case 'PLAYER_JOIN':
+      return {
+        ...state,
+        session: { 
+            ...state.session, 
+            players: [...state.session.players, { ...action.payload, lastAnsweredQuestionIndex: -1 }] 
+        }
+      };
+    case 'SEND_REACTION': {
+        const newReaction = {
+            id: Date.now(),
+            emoji: action.payload.emoji,
+            left: Math.random() * 80 + 10 
+        };
+        return {
+            ...state,
+            session: {
+                ...state.session,
+                lobbyReactions: [...state.session.lobbyReactions, newReaction]
+            }
+        };
+    }
+    case 'REMOVE_REACTION':
+        return {
+            ...state,
+            session: {
+                ...state.session,
+                lobbyReactions: state.session.lobbyReactions.filter(r => r.id !== action.payload)
+            }
+        };
+    case 'START_GAME':
+      return {
+        ...state,
+        view: 'teacher_game',
+        session: { 
+            ...state.session, 
+            status: 'active', 
+            currentQuestionIndex: 0,
+            questionStartTime: Date.now() 
+        }
+      };
+    case 'END_GAME':
+      return {
+          ...state,
+          session: { ...state.session, status: 'finished' }
+      };
+    case 'NEXT_QUESTION':
+      return {
+        ...state,
+        session: { 
+            ...state.session, 
+            currentQuestionIndex: state.session.currentQuestionIndex + 1,
+            questionStartTime: Date.now() 
+        }
+      };
+    case 'PLAYER_ANSWER': {
+        let points = 0;
+        if (action.payload.isCorrect) {
+            if (state.session.settings.scoreMode === 'speed' && state.session.settings.timerEnabled) {
+                const timeTaken = Date.now() - state.session.questionStartTime;
+                const totalTime = state.session.settings.timerDuration * 1000;
+                const ratio = 1 - (timeTaken / totalTime); 
+                points = Math.round(500 + (500 * Math.max(0, ratio)));
+            } else {
+                points = 100;
+            }
+        }
+        const updatedPlayersAnswer = state.session.players.map(p => 
+            p.id === action.payload.playerId 
+            ? { 
+                ...p, 
+                score: p.score + points,
+                lastAnsweredQuestionIndex: state.session.currentQuestionIndex 
+              } 
+            : p
+        );
+        return { ...state, session: { ...state.session, players: updatedPlayersAnswer } };
+    }
+    case 'JEOPARDY_AWARD_POINTS': {
+        const { teamIndex, points: jPoints } = action.payload;
+        const teamsCopy = [...state.session.jeopardyState.teams];
+        teamsCopy[teamIndex].score += jPoints;
+        return {
+            ...state,
+            session: {
+                ...state.session,
+                jeopardyState: { ...state.session.jeopardyState, teams: teamsCopy }
+            }
+        };
+    }
+    case 'JEOPARDY_COMPLETE_QUESTION': {
+        const nextTurn = (state.session.jeopardyState.currentTeamTurn + 1) % state.session.jeopardyState.teams.length;
+        return {
+            ...state,
+            session: {
+                ...state.session,
+                jeopardyState: {
+                    ...state.session.jeopardyState,
+                    completedQuestions: [...state.session.jeopardyState.completedQuestions, action.payload.index],
+                    currentTeamTurn: nextTurn
+                }
+            }
+        };
+    }
+    case 'SET_VIEW': return { ...state, view: action.payload };
+    case 'SET_CURRENT_PLAYER': return { ...state, currentPlayer: action.payload };
+    case 'RESET_APP': return { ...state, view: 'teacher_dashboard', session: initialState.session };
+    case 'LOGOUT': return initialState;
+    default: return state;
+  }
+};
+
+
+// ==================================================================================
+// --- 4. KOMPONENTER: SHARED & LOGIN ---
+// ==================================================================================
+
+const LandingPage = ({ dispatch }) => (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-black flex flex-col items-center justify-center p-6">
+        <div className="text-center mb-12 animate-fade-in">
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-3xl shadow-2xl mb-6 rotate-3 hover:rotate-6 transition-transform duration-500">
+                <Gamepad2 className="w-12 h-12 text-white" />
+            </div>
+            <h1 className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200 tracking-tight mb-4 drop-shadow-sm">Quizmotorn</h1>
+            <p className="text-indigo-300 text-2xl font-medium tracking-wide">Framtidens klassrumsquiz</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-all cursor-pointer group shadow-2xl hover:shadow-indigo-500/10" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'teacher_auth' })}>
+                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/30"><Monitor className="w-8 h-8 text-white" /></div>
+                <h2 className="text-4xl font-bold text-white mb-2">För Lärare</h2>
+                <p className="text-indigo-200 text-lg">Skapa och styr quiz med AI-kraft.</p>
+            </div>
+            <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-3xl hover:bg-white/10 transition-all cursor-pointer group shadow-2xl hover:shadow-pink-500/10" onClick={() => dispatch({ type: 'SET_VIEW', payload: 'student_login' })}>
+                <div className="w-16 h-16 bg-pink-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-pink-500/30"><Smartphone className="w-8 h-8 text-white" /></div>
+                <h2 className="text-4xl font-bold text-white mb-2">För Elever</h2>
+                <p className="text-pink-200 text-lg">Anslut snabbt med PIN-kod.</p>
+            </div>
+        </div>
+    </div>
+);
+
+const TeacherLogin = ({ dispatch }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isSignUp, setIsSignUp] = useState(false);
+
+    const handleAuth = (e) => {
+        e.preventDefault();
+        if (!email || !password) {
+            alert("Fyll i både e-post och lösenord");
+            return;
+        }
+        // Simulera inloggning/registrering
+        const namePart = email.split('@')[0];
+        const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+        
+        dispatch({ 
+            type: 'LOGIN_TEACHER', 
+            payload: { 
+                name: isSignUp ? displayName : 'Lärare Svensson', 
+                email: email 
+            } 
+        });
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-black flex items-center justify-center p-4">
+            <div className="bg-white/10 backdrop-blur-xl p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border border-white/10 animate-fade-in">
+                <h2 className="text-3xl font-bold text-white mb-6">{isSignUp ? 'Skapa konto' : 'Logga in'}</h2>
+                
+                {/* Google Login */}
+                <button onClick={() => dispatch({ type: 'LOGIN_TEACHER', payload: { name: 'Lärare Svensson', email: 'demo@skola.se' } })} className="w-full py-3 px-6 bg-white text-slate-900 rounded-xl flex items-center justify-center gap-3 hover:bg-indigo-50 transition-colors mb-6 font-bold text-lg shadow-lg">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" /> 
+                    {isSignUp ? 'Registrera med Google' : 'Logga in med Google'}
+                </button>
+
+                <div className="relative mb-6">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/20"></div></div>
+                    <div className="relative flex justify-center text-sm"><span className="px-3 text-indigo-200 bg-slate-900/50 backdrop-blur-xl rounded-full">Eller med e-post</span></div>
+                </div>
+
+                {/* Email Form */}
+                <form onSubmit={handleAuth} className="space-y-4 text-left">
+                    <div>
+                        <label className="block text-xs font-bold text-indigo-200 uppercase mb-1 ml-1 flex items-center gap-1"><Mail className="w-3 h-3"/> E-post</label>
+                        <input 
+                            type="email" 
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full p-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-white placeholder-white/20 transition-all"
+                            placeholder="namn@skola.se"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-indigo-200 uppercase mb-1 ml-1 flex items-center gap-1"><Key className="w-3 h-3"/> Lösenord</label>
+                        <input 
+                            type="password" 
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full p-3 bg-slate-950/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-white placeholder-white/20 transition-all"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg hover:shadow-indigo-500/50 mt-2">
+                        {isSignUp ? 'Skapa konto' : 'Logga in'}
+                    </button>
+                </form>
+
+                <div className="mt-6 text-sm text-indigo-200">
+                    {isSignUp ? 'Har du redan ett konto?' : 'Har du inget konto?'} 
+                    <button onClick={() => { setIsSignUp(!isSignUp); setEmail(''); setPassword(''); }} className="ml-2 text-white font-bold hover:underline hover:text-indigo-100 transition-colors">
+                        {isSignUp ? 'Logga in' : 'Skapa ett här'}
+                    </button>
+                </div>
+
+                <button onClick={() => dispatch({type: 'SET_VIEW', payload: 'landing'})} className="mt-8 text-white/40 hover:text-white text-sm font-medium transition-colors">← Tillbaka till start</button>
+            </div>
+        </div>
+    );
+};
+
+// ==================================================================================
+// --- 5. KOMPONENTER: LÄRARE (EDITOR & DASHBOARD) ---
+// ==================================================================================
+
+const QuizEditor = ({ quizToEdit, categories, dispatch }) => {
+    // Default to "Allmänt" if no category exists
+    const [quiz, setQuiz] = useState(quizToEdit ? JSON.parse(JSON.stringify(quizToEdit)) : { title: "Nytt Quiz", category: categories[0], questions: [] });
+    const fileInputRefs = useRef([]);
+
+    const handleQuestionChange = (idx, field, value) => {
+        const updatedQuestions = [...quiz.questions];
+        updatedQuestions[idx][field] = value;
+        setQuiz({ ...quiz, questions: updatedQuestions });
+    };
+
+    const handleOptionChange = (qIdx, optIdx, value) => {
+        const updatedQuestions = [...quiz.questions];
+        updatedQuestions[qIdx].options[optIdx] = value;
+        setQuiz({ ...quiz, questions: updatedQuestions });
+    };
+
+    const addOption = (qIdx) => {
+        const updatedQuestions = [...quiz.questions];
+        updatedQuestions[qIdx].options.push("Nytt alternativ");
+        setQuiz({ ...quiz, questions: updatedQuestions });
+    };
+
+    const removeOption = (qIdx, optIdx) => {
+        const updatedQuestions = [...quiz.questions];
+        if (updatedQuestions[qIdx].options.length <= 2) {
+            alert("Minst 2 alternativ krävs.");
+            return;
+        }
+        updatedQuestions[qIdx].options.splice(optIdx, 1);
+        if (updatedQuestions[qIdx].correctAnswerIndex >= optIdx) {
+             updatedQuestions[qIdx].correctAnswerIndex = Math.max(0, updatedQuestions[qIdx].correctAnswerIndex - 1);
+        }
+        setQuiz({ ...quiz, questions: updatedQuestions });
+    };
+
+    const handleImageUpload = (qIdx, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            handleQuestionChange(qIdx, 'image', reader.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleSave = () => {
+        if (!quiz.title.trim()) { alert("Titel saknas!"); return; }
+        if (quiz.questions.length === 0) { alert("Lägg till minst en fråga."); return; }
+        dispatch({ type: 'SAVE_EDITED_QUIZ', payload: quiz });
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-black pb-12 text-white">
+            <header className="bg-white/5 backdrop-blur-md border-b border-white/10 px-6 py-4 sticky top-0 z-10 flex justify-between items-center">
+                 <div className="flex items-center gap-4">
+                     <button onClick={() => dispatch({type: 'SET_VIEW', payload: 'teacher_dashboard'})} className="p-2 hover:bg-white/10 rounded-full text-white/70 hover:text-white transition-colors"><ArrowLeft className="w-6 h-6" /></button>
+                     <h1 className="font-bold text-xl">Redigera Quiz</h1>
+                 </div>
+                 <button onClick={handleSave} className="px-6 py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-500 flex items-center gap-2 shadow-lg shadow-green-900/20 transition-all">
+                     <Save className="w-4 h-4" /> Spara
+                 </button>
+            </header>
+            <main className="max-w-4xl mx-auto p-6 space-y-8">
+                <div className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm space-y-4">
+                    <div>
+                        <label className="block text-sm font-bold text-indigo-300 mb-2">Quiz Titel</label>
+                        <input 
+                            type="text" 
+                            value={quiz.title} 
+                            onChange={(e) => setQuiz({...quiz, title: e.target.value})}
+                            className="w-full p-3 bg-slate-950/50 border border-white/10 rounded-xl font-bold text-xl focus:ring-2 focus:ring-indigo-500 outline-none text-white placeholder-white/20"
+                        />
+                    </div>
+                    
+                    <div>
+                         <label className="block text-sm font-bold text-indigo-300 mb-2">Kategori</label>
+                         <div className="relative">
+                             <select 
+                                 value={quiz.category || categories[0]} 
+                                 onChange={(e) => setQuiz({...quiz, category: e.target.value})}
+                                 className="w-full p-3 bg-slate-950/50 border border-white/10 rounded-xl text-white appearance-none focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer"
+                             >
+                                 {categories.map(cat => (
+                                     <option key={cat} value={cat} className="bg-slate-900">{cat}</option>
+                                 ))}
+                             </select>
+                             <Tag className="absolute right-4 top-3.5 w-5 h-5 text-indigo-400 pointer-events-none" />
+                         </div>
+                    </div>
+                </div>
+
+                {quiz.questions.map((q, qIdx) => (
+                    <div key={qIdx} className="bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm relative group hover:bg-white/10 transition-colors">
+                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => {
+                                const updated = [...quiz.questions];
+                                updated.splice(qIdx, 1);
+                                setQuiz({...quiz, questions: updated});
+                            }} className="text-red-400 hover:text-red-300 p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"><Trash2 className="w-5 h-5"/></button>
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="bg-indigo-600 text-white px-3 py-1 rounded-lg text-xs font-mono font-bold shadow-lg shadow-indigo-500/30">FRÅGA {qIdx + 1}</span>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Fråga</label>
+                            <input 
+                                type="text" 
+                                value={q.question} 
+                                onChange={(e) => handleQuestionChange(qIdx, 'question', e.target.value)}
+                                className="w-full p-3 bg-slate-950/50 border border-white/10 rounded-xl font-medium focus:ring-2 focus:ring-indigo-500 outline-none text-white"
+                            />
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1 flex items-center gap-1"><ImageIcon className="w-3 h-3"/> Bild (Länk eller Ladda upp)</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="https://..." 
+                                    value={q.image || ''} 
+                                    onChange={(e) => handleQuestionChange(qIdx, 'image', e.target.value)}
+                                    className="flex-1 p-3 bg-slate-950/50 border border-white/10 rounded-xl text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                />
+                                <input type="file" accept="image/*" className="hidden" ref={el => fileInputRefs.current[qIdx] = el} onChange={(e) => handleImageUpload(qIdx, e)} />
+                                <button onClick={() => fileInputRefs.current[qIdx].click()} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-500 flex items-center gap-2 transition-colors"><Upload className="w-4 h-4" /> Ladda upp</button>
+                            </div>
+                            {q.image && <img src={q.image} alt="Preview" className="mt-4 h-32 rounded-xl border border-white/10 object-contain bg-black/40" />}
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Svarsalternativ (Markera rätt svar)</label>
+                            <div className="space-y-3">
+                                {q.options.map((opt, optIdx) => (
+                                    <div key={optIdx} className="flex items-center gap-3">
+                                        <div className="relative flex items-center">
+                                            <input 
+                                                type="radio" 
+                                                name={`correct-${qIdx}`} 
+                                                checked={q.correctAnswerIndex === optIdx}
+                                                onChange={() => handleQuestionChange(qIdx, 'correctAnswerIndex', optIdx)}
+                                                className="w-6 h-6 text-green-500 bg-transparent border-2 border-white/30 focus:ring-green-500 focus:ring-offset-0 cursor-pointer"
+                                            />
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            value={opt}
+                                            onChange={(e) => handleOptionChange(qIdx, optIdx, e.target.value)}
+                                            className={`flex-1 p-3 border rounded-xl text-sm bg-slate-950/50 text-white outline-none focus:ring-2 ${q.correctAnswerIndex === optIdx ? 'border-green-500 ring-1 ring-green-500/50' : 'border-white/10 focus:ring-indigo-500'}`}
+                                        />
+                                        <button onClick={() => removeOption(qIdx, optIdx)} className="text-slate-500 hover:text-red-400 transition-colors"><MinusCircle className="w-6 h-6"/></button>
+                                    </div>
+                                ))}
+                                <button onClick={() => addOption(qIdx)} className="text-sm text-indigo-400 font-bold hover:text-indigo-300 flex items-center gap-1 mt-2 px-2 py-1 rounded hover:bg-white/5 transition-colors"><Plus className="w-4 h-4" /> Lägg till alternativ</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Fördjupning / Förklaring</label>
+                            <textarea 
+                                value={q.explanation || ''} 
+                                onChange={(e) => handleQuestionChange(qIdx, 'explanation', e.target.value)}
+                                className="w-full p-3 bg-slate-950/50 border border-white/10 rounded-xl text-sm h-24 focus:ring-2 focus:ring-indigo-500 outline-none text-white placeholder-white/20"
+                            />
+                        </div>
+                    </div>
+                ))}
+
+                <button 
+                    onClick={() => { const newQ = { question: "Ny fråga?", options: ["Alt 1", "Alt 2"], correctAnswerIndex: 0, explanation: "" }; setQuiz({ ...quiz, questions: [...quiz.questions, newQ] }); }} 
+                    className="w-full py-4 border-2 border-dashed border-white/20 rounded-2xl text-slate-400 font-bold hover:border-indigo-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center justify-center gap-2"
+                >
+                    <Plus className="w-6 h-6" /> Lägg till Fråga
+                </button>
+            </main>
+        </div>
+    );
+};
+
+const TeacherDashboard = ({ state, dispatch }) => {
+  const [jsonInput, setJsonInput] = useState(""); 
+  const [error, setError] = useState('');
+  const [jeopardyConfig, setJeopardyConfig] = useState(null);
+  const [liveConfig, setLiveConfig] = useState(null); 
+  const [selectedCategory, setSelectedCategory] = useState("Alla");
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  const handleSaveQuiz = () => {
+      try {
+          if (!jsonInput.trim()) { setError("Ingen data inmatad"); return; }
+          const parsed = JSON.parse(jsonInput);
+          if (!parsed.questions || !Array.isArray(parsed.questions)) throw new Error("JSON saknar 'questions' array.");
+          dispatch({ type: 'SAVE_QUIZ', payload: parsed });
+          setError('');
+          setJsonInput(""); 
+      } catch (e) { setError("Ogiltig JSON: " + e.message); }
+  };
+
+  const handleCopyPrompt = () => {
+      const textArea = document.createElement("textarea");
+      textArea.value = AI_PROMPT_TEXT;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (err) {
+        console.error('Fallback copy failed', err);
+      }
+      document.body.removeChild(textArea);
+  };
+
+  const handleTitleBlur = (index, newTitle) => {
+      if(newTitle.trim() !== "") {
+          dispatch({ type: 'UPDATE_QUIZ_TITLE', payload: { index, newTitle } });
+      }
+  };
+
+  const handleAddCategory = () => {
+      if(newCategoryName.trim()) {
+          dispatch({ type: 'ADD_CATEGORY', payload: newCategoryName.trim() });
+          setNewCategoryName("");
+      }
+  };
+
+  const openJeopardySetup = (quiz) => setJeopardyConfig({ quiz, teams: 3, teamNames: generateTeamNames(3) });
+  const openLiveSetup = (quiz) => setLiveConfig({ quiz, timerEnabled: false, timerDuration: 30, forceRandomNames: false, scoreMode: 'speed' });
+  
+  const startJeopardy = () => {
+      if (!jeopardyConfig) return;
+      dispatch({ type: 'CREATE_SESSION', payload: { quizData: jeopardyConfig.quiz, settings: { gameMode: 'jeopardy', jeopardyTeams: jeopardyConfig.teams, teamNames: jeopardyConfig.teamNames } } });
+      setJeopardyConfig(null);
+  };
+
+  const startLive = () => {
+      if (!liveConfig) return;
+      dispatch({ type: 'CREATE_SESSION', payload: { quizData: liveConfig.quiz, settings: { gameMode: 'live', timerEnabled: liveConfig.timerEnabled, timerDuration: liveConfig.timerDuration, forceRandomNames: liveConfig.forceRandomNames, scoreMode: liveConfig.scoreMode } } });
+      setLiveConfig(null);
+  }
+
+  const filteredQuizzes = selectedCategory === "Alla" 
+    ? state.savedQuizzes 
+    : state.savedQuizzes.filter(q => q.category === selectedCategory);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-black pb-12 relative text-white">
+      <header className="bg-white/5 backdrop-blur-md border-b border-white/10 px-6 py-4 flex justify-between items-center sticky top-0 z-10">
+         <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                <Gamepad2 className="w-6 h-6" />
+            </div>
+            <h1 className="font-black text-2xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-indigo-200">Quizmotorn</h1>
+         </div>
+         <button onClick={() => dispatch({type: 'LOGOUT'})} className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 hover:bg-red-500/20 px-3 py-2 rounded-lg transition-colors font-medium"><LogOut className="w-4 h-4"/> Logga ut</button>
+      </header>
+      <main className="max-w-6xl mx-auto p-6 space-y-12">
+        
+        {/* CREATE & IMPORT SECTION */}
+        <section>
+             <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2"><Plus className="w-6 h-6 text-indigo-400" /> Skapa / Importera</h2>
+                <button 
+                    onClick={() => dispatch({ type: 'CREATE_EMPTY_QUIZ' })}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-500 transition-all shadow-lg flex items-center gap-2 text-sm"
+                >
+                    <FilePlus className="w-4 h-4" /> Skapa tomt quiz
+                </button>
+             </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm">
+                    <div className="flex items-center gap-2 mb-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
+                    <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-32 overflow-y-auto shadow-inner select-all">{AI_PROMPT_TEXT}</div>
+                    <button onClick={handleCopyPrompt} className="mt-2 w-full py-2 bg-indigo-600/80 text-white font-bold rounded-lg hover:bg-indigo-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5"><Copy className="w-3 h-3" /> Kopiera Prompt</button>
+                </div>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col backdrop-blur-sm">
+                    <div className="flex items-center gap-2 mb-2 text-white font-bold text-sm"><Copy className="w-4 h-4 text-indigo-400" /> Klistra in JSON</div>
+                    <textarea 
+                        value={jsonInput} 
+                        onChange={(e) => setJsonInput(e.target.value)} 
+                        className="w-full flex-1 min-h-[140px] font-mono text-[10px] p-3 bg-slate-950/50 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2 placeholder-white/20 scrollbar-hide" 
+                        placeholder={DEFAULT_QUIZ_JSON} 
+                    />
+                    {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
+                    <button onClick={handleSaveQuiz} className="w-full py-2 bg-white text-slate-900 hover:bg-indigo-50 rounded-xl font-bold text-sm shadow-lg transition-all">Spara till Bibliotek</button>
+                </div>
+            </div>
+        </section>
+
+        <hr className="border-white/10" />
+        <section>
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2"><BookOpen className="w-6 h-6 text-indigo-400" /> Mitt Bibliotek</h2>
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                    <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10">
+                        <button 
+                            onClick={() => setSelectedCategory("Alla")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${selectedCategory === "Alla" ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                        >
+                            Alla
+                        </button>
+                        {state.categories.map(cat => (
+                            <button 
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${selectedCategory === cat ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                    <button onClick={() => setShowCategoryManager(true)} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-slate-400 hover:text-white transition-colors" title="Hantera kategorier">
+                        <Settings className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {state.savedQuizzes.length === 0 ? (
+                <div className="text-center py-16 bg-white/5 rounded-3xl border-2 border-dashed border-white/10">
+                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <BookOpen className="w-8 h-8 text-slate-500" />
+                    </div>
+                    <p className="text-slate-400">Inga sparade quiz än. Importera ett ovan!</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredQuizzes.map((quiz, idx) => (
+                        <div key={idx} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col h-full hover:bg-white/10 hover:border-white/20 transition-all backdrop-blur-sm group relative">
+                            
+                            <div className="flex-1 mb-2">
+                                <div className="flex flex-col justify-start">
+                                    {/* Updated Compact Layout */}
+                                    <input 
+                                        type="text"
+                                        defaultValue={quiz.title}
+                                        onBlur={(e) => handleTitleBlur(idx, e.target.value)}
+                                        className="text-lg font-bold text-white bg-transparent border-b border-transparent hover:border-white/30 focus:border-indigo-500 focus:outline-none transition-colors w-full leading-tight truncate mb-2"
+                                    />
+                                    
+                                    <div className="flex items-center justify-between">
+                                        {/* Left side: Metadata */}
+                                        <div className="flex items-center gap-2">
+                                            <div className="bg-white/10 inline-block px-2 py-1 rounded-md text-[10px] font-bold text-indigo-200 border border-white/5">
+                                                {quiz.questions.length} frågor
+                                            </div>
+                                            <div className="bg-white/10 inline-block px-2 py-1 rounded-md text-[10px] font-bold text-slate-300 border border-white/5">
+                                                {quiz.category || "Allmänt"}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Right side: Actions */}
+                                        <div className="flex gap-1">
+                                            <button onClick={() => dispatch({ type: 'START_EDITING_QUIZ', payload: idx })} className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-white/10 rounded-lg transition-colors" title="Redigera"><Edit2 className="w-4 h-4" /></button>
+                                            <button onClick={() => dispatch({type: 'DELETE_QUIZ', payload: idx})} className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors" title="Radera"><Trash2 className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 mt-auto pt-2 border-t border-white/5">
+                                <button onClick={() => openLiveSetup(quiz)} className="col-span-3 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/50"><Smartphone className="w-4 h-4" /> Live Quiz</button>
+                                <button onClick={() => openJeopardySetup(quiz)} className="col-span-2 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-orange-500 to-pink-600 text-white hover:from-orange-400 hover:to-pink-500 transition-all flex items-center justify-center gap-1 shadow-lg shadow-orange-900/50"><Grid className="w-3 h-3" /> Jeopardy</button>
+                                <button onClick={() => dispatch({ type: 'CREATE_SESSION', payload: { quizData: quiz, settings: { gameMode: 'solo' } } })} className="py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-400 hover:to-teal-500 transition-all flex items-center justify-center gap-1 shadow-lg shadow-emerald-900/50"><BookOpen className="w-3 h-3" /> Öva</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </section>
+      </main>
+      
+      {/* CATEGORY MANAGER MODAL */}
+      {showCategoryManager && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-white/10 animate-fade-in">
+                  <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                      <h3 className="font-bold text-xl text-white flex items-center gap-2"><Tag className="w-5 h-5" /> Hantera Kategorier</h3>
+                      <button onClick={() => setShowCategoryManager(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5"/></button>
+                  </div>
+                  <div className="p-6 space-y-6">
+                      <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            placeholder="Ny kategori..."
+                            className="flex-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                          />
+                          <button onClick={handleAddCategory} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500">Lägg till</button>
+                      </div>
+                      <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto">
+                          {state.categories.map(cat => (
+                              <div key={cat} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg text-sm text-white border border-white/5">
+                                  {cat}
+                                  <button onClick={() => dispatch({type: 'DELETE_CATEGORY', payload: cat})} className="text-slate-400 hover:text-red-400 ml-1"><X className="w-3 h-3"/></button>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* JEOPARDY MODAL */}
+      {jeopardyConfig && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
+                  <div className="bg-gradient-to-r from-orange-500 to-pink-600 p-5 flex justify-between items-center text-white">
+                      <h3 className="font-bold text-xl flex items-center gap-2"><Grid className="w-6 h-6" /> Konfigurera Jeopardy</h3>
+                      <button onClick={() => setJeopardyConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X className="w-5 h-5"/></button>
+                  </div>
+                  <div className="p-8 space-y-8">
+                      <div>
+                          <label className="block text-sm font-bold text-slate-300 mb-3">Antal Lag: <span className="text-orange-400 text-lg ml-1">{jeopardyConfig.teams}</span></label>
+                          <input 
+                            type="range" min="2" max="6" 
+                            value={jeopardyConfig.teams} 
+                            onChange={(e) => setJeopardyConfig(p => ({...p, teams: parseInt(e.target.value), teamNames: generateTeamNames(parseInt(e.target.value))}))} 
+                            className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <div className="flex justify-between text-xs text-slate-500 mt-2 font-mono px-1"><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+                      </div>
+                      <div className="bg-slate-950/50 p-5 rounded-2xl border border-white/10">
+                          <div className="flex justify-between items-center mb-4">
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Genererade Lagnamn</span>
+                              <button onClick={() => setJeopardyConfig(p => ({...p, teamNames: generateTeamNames(p.teams)}))} className="text-xs flex items-center gap-1 text-orange-400 font-bold hover:text-orange-300 transition-colors"><Shuffle className="w-3 h-3"/> Slumpa nya</button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">{jeopardyConfig.teamNames.map((name, idx) => (<div key={idx} className="bg-slate-800 px-3 py-2.5 rounded-xl border border-white/5 text-sm font-bold text-white shadow-sm text-center">{name}</div>))}</div>
+                      </div>
+                      <button onClick={startJeopardy} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-xl hover:bg-slate-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2">Starta Spelet <ArrowRight className="w-5 h-5" /></button>
+                  </div>
+              </div>
+          </div>
+      )}
+      {liveConfig && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 flex justify-between items-center text-white">
+                      <h3 className="font-bold text-xl flex items-center gap-2"><Smartphone className="w-6 h-6" /> Konfigurera Live Quiz</h3>
+                      <button onClick={() => setLiveConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X className="w-5 h-5"/></button>
+                  </div>
+                  <div className="p-8 space-y-6">
+                      <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/10">
+                          <div><div className="font-bold text-white">Tvinga slumpade namn</div><div className="text-xs text-slate-400 mt-1">Förhindrar olämpliga namn</div></div>
+                          <button onClick={() => setLiveConfig(p => ({...p, forceRandomNames: !p.forceRandomNames}))} className={`w-14 h-8 rounded-full transition-colors relative ${liveConfig.forceRandomNames ? 'bg-green-500' : 'bg-slate-600'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.forceRandomNames ? 'left-7' : 'left-1'}`} /></button>
+                      </div>
+                      
+                      <div className="bg-slate-800/50 p-5 rounded-2xl border border-white/10">
+                           <div className="flex items-center justify-between mb-6">
+                                <div><div className="font-bold text-white">Tid per fråga</div><div className="text-xs text-slate-400 mt-1">Begränsa svarstiden</div></div>
+                                <button 
+                                    onClick={() => setLiveConfig(p => {
+                                        const newEnabled = !p.timerEnabled;
+                                        return {...p, timerEnabled: newEnabled, scoreMode: newEnabled ? p.scoreMode : 'simple'}; 
+                                    })} 
+                                    className={`w-14 h-8 rounded-full transition-colors relative ${liveConfig.timerEnabled ? 'bg-green-500' : 'bg-slate-600'}`}
+                                >
+                                    <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.timerEnabled ? 'left-7' : 'left-1'}`} />
+                                </button>
+                           </div>
+                           {liveConfig.timerEnabled && (
+                               <div className="animate-fade-in">
+                                   <div className="flex justify-between mb-3 text-sm font-bold text-slate-300"><span>10s</span><span className="text-indigo-400">{liveConfig.timerDuration} sekunder</span><span>60s</span></div>
+                                   <input type="range" min="10" max="60" step="5" value={liveConfig.timerDuration} onChange={(e) => setLiveConfig(p => ({...p, timerDuration: parseInt(e.target.value)}))} className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"/>
+                               </div>
+                           )}
+                      </div>
+                      
+                       {liveConfig.timerEnabled && (
+                        <div className="flex items-center justify-between p-5 bg-slate-800/50 rounded-2xl border border-white/10 animate-fade-in">
+                            <div><div className="font-bold text-white">Poängsystem</div><div className="text-xs text-slate-400 mt-1">{liveConfig.scoreMode === 'speed' ? 'Hastighet ger mer poäng' : 'Bara rätt svar (Enkelt)'}</div></div>
+                            <div className="flex bg-slate-950 rounded-xl p-1 border border-white/5">
+                                <button onClick={() => setLiveConfig(p => ({...p, scoreMode: 'speed'}))} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${liveConfig.scoreMode === 'speed' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Zap className="w-3 h-3"/> Snabbhet</button>
+                                <button onClick={() => setLiveConfig(p => ({...p, scoreMode: 'simple'}))} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${liveConfig.scoreMode === 'simple' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><CheckCircle className="w-3 h-3"/> Enkelt</button>
+                            </div>
+                        </div>
+                       )}
+
+                      <button onClick={startLive} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-xl hover:bg-slate-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2">Starta Quiz <ArrowRight className="w-5 h-5" /></button>
+                  </div>
+              </div>
+          </div>
+      )}
+    </div>
+  );
+};
+
+// ==================================================================================
+// --- 6. KOMPONENTER: LÄRARE (SPEL) ---
+// ==================================================================================
+
+const TeacherJeopardy = ({ session, dispatch }) => {
+    const [activeQuestion, setActiveQuestion] = useState(null); 
+    const [showAnswer, setShowAnswer] = useState(false);
+    const [resultState, setResultState] = useState(null); 
+    const currentTeamIdx = session.jeopardyState.currentTeamTurn;
+    const currentTeam = session.jeopardyState.teams[currentTeamIdx];
+    const currentModifier = activeQuestion !== null ? session.jeopardyState.questionModifiers[activeQuestion] : 'normal';
+
+    const handleGridClick = (index) => {
+        if (session.jeopardyState.completedQuestions.includes(index)) return;
+        setActiveQuestion(index); setShowAnswer(false); setResultState(null);
+    };
+
+    const handleOptionClick = (optionIndex) => {
+        if (resultState !== null) return;
+        const question = session.quizData.questions[activeQuestion];
+        const isCorrect = optionIndex === question.correctAnswerIndex;
+        setResultState(isCorrect ? 'correct' : 'wrong');
+        setShowAnswer(true);
+        let points = currentModifier === 'gamble' ? (isCorrect ? 300 : -300) : (currentModifier === 'double' && isCorrect ? 200 : (isCorrect ? 100 : 0));
+        setTimeout(() => {
+            dispatch({ type: 'JEOPARDY_AWARD_POINTS', payload: { teamIndex: currentTeamIdx, points: points } });
+            setTimeout(() => {
+                dispatch({ type: 'JEOPARDY_COMPLETE_QUESTION', payload: { index: activeQuestion } });
+                setActiveQuestion(null); setResultState(null);
+            }, 2000);
+        }, 1000);
+    };
+
+    return (
+        <div className="h-screen bg-slate-900 text-white flex flex-col overflow-hidden">
+            <div className="bg-white text-slate-900 p-4 shadow-lg flex justify-between items-center z-10">
+                <h2 className="font-bold text-xl">{session.quizData.title}</h2>
+                <div className="flex items-center gap-4">
+                    <div className="text-sm font-bold text-slate-500 flex items-center gap-2"><RotateCw className="w-4 h-4" /> Turas om: <span className="text-indigo-600 uppercase bg-indigo-50 px-2 py-1 rounded">{currentTeam.name}</span></div>
+                    <button onClick={() => dispatch({type: 'RESET_APP'})} className="px-4 py-1 border border-slate-300 rounded hover:bg-slate-100 text-sm font-bold">Avsluta</button>
+                </div>
+            </div>
+            <div className="flex-1 p-6 overflow-y-auto relative">
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mb-6">{session.jeopardyState.teams.map((team, idx) => (<div key={idx} className={`bg-white rounded-lg p-3 shadow flex flex-col justify-between min-h-[100px] transition-all border-4 ${currentTeamIdx === idx ? 'border-indigo-600 ring-4 ring-indigo-600/20 scale-105 z-10' : 'border-transparent opacity-80'}`}><div><div className="text-xs font-bold text-slate-500 uppercase mb-1 truncate flex justify-between">{team.name}{currentTeamIdx === idx && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}</div><div className="text-3xl font-black text-slate-800">{team.score}p</div></div></div>))}</div>
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-4 max-w-6xl mx-auto">{session.quizData.questions.map((q, idx) => { const isCompleted = session.jeopardyState.completedQuestions.includes(idx); const colorClass = JEOPARDY_COLORS[idx % JEOPARDY_COLORS.length]; return ( <button key={idx} onClick={() => handleGridClick(idx)} disabled={isCompleted} className={`aspect-square rounded-2xl shadow-lg flex items-center justify-center text-4xl font-black transition-all transform relative overflow-hidden ${isCompleted ? 'bg-slate-800 text-slate-600 cursor-not-allowed shadow-inner' : `${colorClass} hover:scale-105 hover:shadow-xl active:scale-95 cursor-pointer`}`}>{idx + 1}{isCompleted && <div className="absolute inset-0 bg-black/20" />}</button> ); })}</div>
+            </div>
+            {activeQuestion !== null && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-6"><div className="bg-white text-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] relative"><div className="absolute top-0 left-0 right-0 h-2 bg-slate-200">{currentModifier === 'gamble' && <div className="h-full bg-red-500 animate-pulse" />}{currentModifier === 'double' && <div className="h-full bg-yellow-400" />}{currentModifier === 'normal' && <div className="h-full bg-indigo-500" />}</div><div className="p-8 flex-1 overflow-y-auto flex flex-col"><div className="flex justify-between items-start mb-8"><div className="text-slate-400 font-bold uppercase tracking-widest">Fråga {activeQuestion + 1}</div><div className="flex gap-2">{currentModifier === 'gamble' && <span className="px-4 py-1 bg-red-100 text-red-700 rounded-full font-bold flex items-center gap-2 border border-red-200"><AlertTriangle className="w-4 h-4" /> RISK</span>}{currentModifier === 'double' && <span className="px-4 py-1 bg-yellow-100 text-yellow-700 rounded-full font-bold flex items-center gap-2 border border-yellow-200"><Zap className="w-4 h-4" /> DUBBEL</span>}</div></div><h2 className="text-3xl md:text-5xl font-bold mb-12 text-center leading-tight flex-1 flex items-center justify-center">{session.quizData.questions[activeQuestion].question}</h2><div className="max-w-4xl mx-auto w-full"><div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 mb-6 text-center"><div className="text-sm text-indigo-400 font-bold uppercase mb-1">Det är er tur</div><div className="text-2xl font-black text-indigo-900">{currentTeam.name}</div></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{session.quizData.questions[activeQuestion].options.map((opt, idx) => (<button key={idx} onClick={() => handleOptionClick(idx)} disabled={resultState !== null} className={`p-6 border-2 rounded-xl text-lg font-bold transition-all ${resultState !== null ? (idx === session.quizData.questions[activeQuestion].correctAnswerIndex ? "bg-green-500 border-green-600 text-white" : "opacity-30 grayscale") : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-indigo-300"}`}>{opt}</button>))}</div></div>{showAnswer && (<div className="mt-6 bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded animate-fade-in"><div className="flex items-center gap-2 font-bold text-indigo-900 mb-1">{resultState === 'correct' ? <CheckCircle className="text-green-600"/> : <XCircle className="text-red-500"/>}{resultState === 'correct' ? 'Rätt svar!' : 'Tyvärr fel...'}</div><p className="text-indigo-800">{session.quizData.questions[activeQuestion].explanation}</p></div>)}</div><div className="bg-slate-100 p-4 border-t border-slate-200 flex justify-between items-center"><div className="text-xs text-slate-400">Poäng delas ut automatiskt.</div><button onClick={() => {dispatch({ type: 'JEOPARDY_COMPLETE_QUESTION', payload: { index: activeQuestion } }); setActiveQuestion(null);}} className="text-slate-500 hover:text-slate-800 font-bold text-sm">Hoppa över</button></div></div></div>)}
+        </div>
+    );
+};
+
+// ==================================================================================
+// --- 7. KOMPONENTER: ÖVRIGT (LOBBY & SHARE) ---
+// ==================================================================================
+
+const TeacherSoloShare = ({ session, dispatch }) => (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-2xl w-full bg-white p-8 rounded-2xl shadow-xl border border-slate-100 text-center">
+            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"><BookOpen className="w-8 h-8" /></div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-4">Redo för självstudier!</h2>
+            <p className="text-slate-500 mb-8">Dela denna länk.</p>
+            <div className="bg-slate-100 p-4 rounded-lg font-mono text-slate-600 break-all border border-slate-200 mb-6 select-all">https://quizmotorn.se/solo/{session.pin}</div>
+            <div className="flex gap-4 justify-center"><button onClick={() => alert("Kopierad!")} className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold">Kopiera Länk</button><button onClick={() => dispatch({type: 'RESET_APP'})} className="px-6 py-3 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold">Dashboard</button></div>
+        </div>
+    </div>
+);
+
+const TeacherLobby = ({ session, dispatch }) => {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=https://quizmotorn.se?pin=${session.pin}`;
+  
+  const [visibleReactions, setVisibleReactions] = useState([]);
+  
+  useEffect(() => {
+      if (session.lobbyReactions.length > 0) {
+          const latest = session.lobbyReactions[session.lobbyReactions.length - 1];
+          setVisibleReactions(prev => [...prev, latest]);
+          
+          const timer = setTimeout(() => {
+              setVisibleReactions(prev => prev.filter(r => r.id !== latest.id));
+              dispatch({ type: 'REMOVE_REACTION', payload: latest.id });
+          }, 2000);
+          return () => clearTimeout(timer);
+      }
+  }, [session.lobbyReactions, dispatch]);
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-900 text-white p-8 relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {visibleReactions.map(r => (
+              <div 
+                key={r.id} 
+                className="absolute bottom-0 text-4xl animate-float-up opacity-0"
+                style={{ left: `${r.left}%` }}
+              >
+                  {r.emoji}
+              </div>
+          ))}
+      </div>
+
+      <div className="flex justify-between items-start relative z-10">
+        <div>
+          <h2 className="text-slate-400 font-medium tracking-wider uppercase text-sm">Gå med med kod:</h2>
+          <div className="text-8xl font-black tracking-widest text-white drop-shadow-lg mt-2">{session.pin}</div>
+        </div>
+        <div className="bg-white p-2 rounded-xl"><img src={qrUrl} alt="QR" className="w-32 h-32 object-contain" /></div>
+      </div>
+      <div className="flex-1 flex items-center justify-center relative z-10">
+        {session.players.length === 0 ? <div className="text-center animate-pulse opacity-50"><div className="text-2xl">Väntar på deltagare...</div></div> : <div className="flex flex-wrap gap-4 justify-center max-w-5xl">{session.players.map(p => (<div key={p.id} className="bg-white text-slate-900 px-6 py-3 rounded-full font-bold text-xl shadow-lg animate-bounce-in">{p.avatar} {p.name}</div>))}</div>}
+      </div>
+      <div className="flex justify-between items-center border-t border-slate-800 pt-6 relative z-10">
+        <div className="text-2xl font-bold flex items-center gap-2 text-slate-400"><Users className="w-8 h-8" />{session.players.length} anslutna</div>
+        <button onClick={() => dispatch({ type: 'START_GAME' })} className="px-8 py-4 text-white bg-green-500 hover:bg-green-600 rounded-xl font-bold text-2xl shadow-lg transition-all">Starta Quiz</button>
+      </div>
+    </div>
+  );
+};
+
+// ==================================================================================
+// --- 8. KOMPONENTER: ELEV ---
+// ==================================================================================
+
+const StudentLogin = ({ session, dispatch }) => {
+  const [pin, setPin] = useState('');
+  const [name, setName] = useState('');
+  
+  const handleJoin = () => {
+    if (session.pin && pin !== session.pin) { alert("Fel PIN!"); return; }
+    if (!session.pin) { alert("Ingen session startad."); return; }
+    const finalName = session.settings.forceRandomNames ? generateRandomName() : (name.trim() || generateRandomName());
+    const player = { id: Date.now(), name: finalName, score: 0, avatar: '🎓' };
+    dispatch({ type: 'PLAYER_JOIN', payload: player });
+    dispatch({ type: 'SET_CURRENT_PLAYER', payload: player });
+    dispatch({ type: 'SET_VIEW', payload: 'student_lobby' });
+  };
+
+  return (
+    <div className="h-screen bg-gradient-to-b from-pink-500 to-orange-400 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-md p-8 rounded-3xl shadow-2xl space-y-6">
+        <div className="text-center mb-8"><h1 className="text-3xl font-black text-slate-800">Quizmotorn</h1><p className="text-slate-400 font-bold">Elev</p></div>
+        <div><label className="block text-sm font-bold text-slate-600 mb-2">GAME PIN</label><input type="tel" placeholder="000000" value={pin} onChange={e => setPin(e.target.value)} className="w-full text-center text-4xl tracking-widest p-4 bg-slate-100 rounded-xl border-2 border-slate-200 focus:border-pink-500 focus:outline-none font-mono text-slate-900 font-bold" /></div>
+        {!session.settings.forceRandomNames && (
+            <div className="relative"><label className="block text-sm font-bold text-slate-600 mb-2">Ditt Namn</label><div className="flex gap-2"><input type="text" placeholder="Namn..." value={name} onChange={e => setName(e.target.value)} className="flex-1 p-4 bg-slate-100 rounded-xl border-2 border-slate-200 focus:border-pink-500 focus:outline-none font-bold text-lg" /><button onClick={() => setName(generateRandomName())} className="p-4 bg-pink-100 text-pink-600 border-2 border-pink-200 rounded-xl hover:bg-pink-200 active:scale-95 transition-transform"><Shuffle className="w-6 h-6" /></button></div></div>
+        )}
+        {session.settings.forceRandomNames && (<div className="text-center text-sm text-slate-500 italic bg-slate-50 p-2 rounded">Ditt namn slumpas automatiskt när du går med.</div>)}
+        <button onClick={handleJoin} className="w-full py-4 bg-black text-white rounded-xl font-bold text-xl shadow-lg hover:bg-slate-800 transition-transform active:scale-95 mt-4">Gå med!</button>
+        <button onClick={() => dispatch({type: 'SET_VIEW', payload: 'landing'})} className="w-full mt-2 text-slate-400 hover:text-slate-600 text-sm">Avbryt</button>
+      </div>
+    </div>
+  );
+};
+
+const StudentLobby = ({ currentPlayer, dispatch }) => (
+    <div className="h-screen bg-indigo-600 flex flex-col items-center justify-center text-white p-4 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center">
+            <Gamepad2 className="w-16 h-16 mb-4 opacity-80" />
+            <h1 className="text-3xl font-black mb-2">Väntar...</h1>
+            <p className="text-indigo-200 mb-8">Håll koll på lärarens skärm</p>
+            <div className="bg-white/10 px-6 py-3 rounded-xl backdrop-blur-sm border border-white/20 mb-8">
+                <div className="text-xs text-indigo-200 uppercase font-bold">Spelarnamn</div>
+                <div className="text-2xl font-bold flex items-center justify-center gap-2"><span>{currentPlayer?.avatar}</span>{currentPlayer?.name}</div>
+            </div>
+        </div>
+        
+        <div className="w-full max-w-sm bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 mb-4">
+            <p className="text-xs font-bold text-indigo-200 uppercase mb-2">Skicka reaktion</p>
+            <div className="flex justify-between gap-2">
+                <button onClick={() => dispatch({type: 'SEND_REACTION', payload: {emoji: '🔥'}})} className="p-3 bg-white/20 rounded-xl hover:bg-white/40 active:scale-95 transition-all text-2xl">🔥</button>
+                <button onClick={() => dispatch({type: 'SEND_REACTION', payload: {emoji: '❤️'}})} className="p-3 bg-white/20 rounded-xl hover:bg-white/40 active:scale-95 transition-all text-2xl">❤️</button>
+                <button onClick={() => dispatch({type: 'SEND_REACTION', payload: {emoji: '👏'}})} className="p-3 bg-white/20 rounded-xl hover:bg-white/40 active:scale-95 transition-all text-2xl">👏</button>
+                <button onClick={() => dispatch({type: 'SEND_REACTION', payload: {emoji: '🚀'}})} className="p-3 bg-white/20 rounded-xl hover:bg-white/40 active:scale-95 transition-all text-2xl">🚀</button>
+            </div>
+        </div>
+    </div>
+);
+
+const StudentGame = ({ session, player, dispatch }) => {
+  const [submitted, setSubmitted] = useState(null);
+  const question = session.quizData.questions[session.currentQuestionIndex];
+  useEffect(() => { setSubmitted(null); }, [session.currentQuestionIndex]);
+  const handleAnswer = (index) => {
+    if (submitted !== null) return;
+    setSubmitted(index);
+    const isCorrect = index === question.correctAnswerIndex;
+    dispatch({ type: 'PLAYER_ANSWER', payload: { playerId: player.id, isCorrect } });
+  };
+  if (!question) return <div className="h-screen bg-indigo-600 flex flex-col items-center justify-center text-white p-4 text-center"><h2 className="text-2xl font-bold animate-pulse">Titta på tavlan...</h2></div>;
+  return (
+    <div className="h-screen bg-slate-100 flex flex-col">
+      <div className="bg-white p-4 shadow-sm border-b border-slate-200 text-center">
+        <div className="text-sm text-slate-500 font-bold uppercase mb-1">Fråga {session.currentQuestionIndex + 1}</div>
+        <h3 className="text-lg font-bold text-slate-800 leading-tight">{question.question}</h3>
+      </div>
+      
+      <div className="flex-1 p-4 flex flex-col justify-center gap-3">
+        {submitted === null ? (
+            <div className="grid grid-cols-2 gap-3 h-full max-h-[500px]">
+            {['A', 'B', 'C', 'D'].map((label, idx) => {
+                const gradients = ['from-pink-500 to-rose-600', 'from-blue-500 to-cyan-600', 'from-yellow-400 to-orange-500', 'from-purple-500 to-indigo-600'];
+                return (
+                    <button key={idx} onClick={() => handleAnswer(idx)} className={`rounded-2xl shadow-lg active:scale-90 transition-transform flex items-center justify-center border-b-4 border-black/10 text-white text-7xl font-black drop-shadow-md bg-gradient-to-br ${gradients[idx % 4]}`}>
+                        {label}
+                    </button>
+                );
+            })}
+            </div>
+        ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center animate-fade-in">
+                <div className="bg-white p-8 rounded-full shadow-xl mb-8">
+                    <CheckCircle className="w-24 h-24 text-indigo-500 animate-pulse" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-800 mb-2">Svar mottaget!</h2>
+                <p className="text-slate-500">Väntar på resultatet...</p>
+            </div>
+        )}
+      </div>
+      
+      <div className="bg-white p-4 border-t border-slate-200 flex justify-between items-center">
+        <div className="font-bold text-slate-700 flex items-center gap-2"><span className="bg-slate-100 p-1 rounded">{player.avatar}</span>{player.name}</div>
+        <div className="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-sm">{player.score} p</div>
+      </div>
+    </div>
+  );
+};
+
+const StudentFinished = ({ player, dispatch }) => (
+    <div className="h-screen bg-indigo-600 flex flex-col items-center justify-center text-white p-4 text-center">
+        <Trophy className="w-24 h-24 text-yellow-400 mb-6 drop-shadow-lg" />
+        <h1 className="text-4xl font-black mb-2">Bra jobbat!</h1>
+        <p className="text-indigo-200 text-lg mb-8">Quizet är slut.</p>
+        
+        <div className="bg-white/20 backdrop-blur-md p-6 rounded-2xl border border-white/10 w-full max-w-xs">
+            <div className="text-sm font-bold text-indigo-200 uppercase mb-1">Din Poäng</div>
+            <div className="text-5xl font-black mb-4">{player.score}</div>
+            <div className="flex items-center justify-center gap-2 text-sm font-medium bg-black/20 py-2 rounded-lg">
+                <UserCheck className="w-4 h-4" /> {player.name}
+            </div>
+        </div>
+        
+        <button onClick={() => dispatch({type: 'SET_VIEW', payload: 'student_login'})} className="mt-12 text-white/50 hover:text-white font-bold text-sm transition-colors">Lämna</button>
+    </div>
+);
+
+// ==================================================================================
+// --- 9. KOMPONENTER: LIVE GAME ---
+// ==================================================================================
+
+const TeacherLiveGame = ({ session, dispatch }) => {
+  const question = session.quizData.questions[session.currentQuestionIndex];
+  const isFinished = session.status === 'finished' || session.currentQuestionIndex >= session.quizData.questions.length;
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(session.settings.timerEnabled ? session.settings.timerDuration : null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [zoomImage, setZoomImage] = useState(null); 
+
+  const answersCount = session.players.filter(p => p.lastAnsweredQuestionIndex === session.currentQuestionIndex).length;
+  const totalPlayers = session.players.length;
+  
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+      if (!session.settings.timerEnabled || showAnswer || isFinished || timeLeft === null) return;
+      if (timeLeft <= 0) {
+          setShowAnswer(true);
+          return;
+      }
+      const timerId = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
+      return () => clearInterval(timerId);
+  }, [timeLeft, showAnswer, isFinished, session.settings.timerEnabled]);
+
+  useEffect(() => {
+      if (session.settings.timerEnabled) setTimeLeft(session.settings.timerDuration);
+      setShowAnswer(false);
+  }, [session.currentQuestionIndex, session.settings.timerEnabled, session.settings.timerDuration]);
+
+  useEffect(() => {
+      if (showAnswer && scrollRef.current) {
+          setTimeout(() => {
+             scrollRef.current.scrollTo({
+                 top: scrollRef.current.scrollHeight,
+                 behavior: 'smooth'
+             });
+          }, 100);
+      }
+  }, [showAnswer]);
+  
+  const getTimerColor = (current, total) => {
+      const percentage = (current / total) * 100;
+      if (percentage > 60) return 'bg-green-500'; 
+      if (percentage > 30) return 'bg-yellow-400'; 
+      return 'bg-red-500 animate-pulse'; 
+  };
+
+  if (isFinished) {
+    return (
+      <div className="flex flex-col h-screen items-center justify-center bg-slate-900 text-white p-8">
+        <Trophy className="w-24 h-24 text-yellow-400 mb-6" />
+        <h1 className="text-6xl font-black mb-12">Resultat</h1>
+        <div className="w-full max-w-2xl space-y-4">{[...session.players].sort((a, b) => b.score - a.score).slice(0, 5).map((p, i) => (<div key={p.id} className="flex justify-between items-center bg-white/10 p-6 rounded-xl border border-white/20"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">{i + 1}</div><span className="text-2xl font-bold">{p.name}</span></div><span className="text-2xl font-mono">{p.score} p</span></div>))}</div>
+        <button onClick={() => dispatch({ type: 'RESET_APP' })} className="mt-12 px-8 py-3 bg-white text-slate-900 rounded-lg font-bold hover:bg-gray-100">Avsluta Session</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
+      {/* Header Section - Fixed at top */}
+      <div className="p-6 pb-0 flex-shrink-0">
+        <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-4">
+                <div className="bg-white/10 text-slate-300 px-4 py-2 rounded-full font-mono shadow-sm border border-white/10">
+                    Fråga {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
+                </div>
+                {!showAnswer && (
+                    <div className="flex items-center gap-2 bg-indigo-600/20 px-4 py-2 rounded-full border border-indigo-500/30 text-indigo-200">
+                        <UserCheck className="w-4 h-4" /> {answersCount} / {totalPlayers} svar
+                    </div>
+                )}
+            </div>
+            
+            <div className="flex gap-4 items-center">
+                <button onClick={() => setShowExitConfirm(true)} className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 transition-colors font-bold text-sm"><StopCircle className="w-4 h-4" /> Avsluta</button>
+            </div>
+        </div>
+        
+        {/* Animated Timer Bar */}
+        {session.settings.timerEnabled && !showAnswer && (
+            <div className="w-full h-3 bg-slate-800 rounded-full mb-6 overflow-hidden relative shadow-inner">
+                <div 
+                    className={`h-full transition-all duration-1000 ease-linear ${getTimerColor(timeLeft, session.settings.timerDuration)}`}
+                    style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
+                />
+            </div>
+        )}
+      </div>
+      
+      {/* Scrollable Content Area with padding-bottom for footer clearance */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 flex flex-col items-center pt-8 pb-40">
+        <div className="max-w-6xl w-full flex flex-col items-center justify-start my-auto min-h-full">
+            <h2 className="text-3xl md:text-5xl font-bold text-center mb-8 leading-tight drop-shadow-lg max-w-4xl">{question.question}</h2>
+            
+            {question.image && (
+                 <div className="mb-8 w-full flex justify-center">
+                    <div className="relative group cursor-zoom-in" onClick={() => setZoomImage(question.image)}>
+                        <img src={question.image} alt="Quiz question" className="max-h-[15vh] w-auto object-contain rounded-xl shadow-lg border border-white/10 transition-transform group-hover:scale-105" />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 rounded-xl transition-opacity"><Maximize2 className="w-8 h-8 text-white drop-shadow-md" /></div>
+                    </div>
+                 </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-8">
+            {question.options.map((opt, idx) => {
+                const isCorrect = idx === question.correctAnswerIndex;
+                const letters = ['A', 'B', 'C', 'D'];
+                const gradients = ['from-pink-500 to-rose-600', 'from-blue-500 to-cyan-600', 'from-yellow-400 to-orange-500', 'from-purple-500 to-indigo-600'];
+                return (
+                <div key={idx} className={`relative overflow-hidden rounded-2xl p-1 transition-all duration-300 ${showAnswer ? (isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600 scale-105 shadow-[0_0_30px_rgba(74,222,128,0.5)]' : 'bg-slate-800 opacity-30 grayscale') : 'bg-slate-800 hover:bg-slate-700 hover:scale-[1.02] cursor-default'}`}>
+                    <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-8 flex items-center gap-6 relative z-10">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>{letters[idx]}</div>
+                        <span className="text-2xl font-bold text-white">{opt}</span>
+                    </div>
+                    {!showAnswer && <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />}
+                </div>
+                );
+            })}
+            </div>
+
+            {showAnswer && (
+            <div className="w-full p-6 rounded-2xl mb-6 animate-fade-in border border-indigo-500/30 bg-indigo-900/20 backdrop-blur-md">
+                <h3 className="font-bold mb-2 flex items-center gap-2 text-indigo-300 text-lg"><Monitor className="w-5 h-5"/> Fördjupning</h3>
+                <p className="text-xl leading-relaxed text-indigo-100 font-light">{question.explanation}</p>
+            </div>
+            )}
+        </div>
+      </div>
+
+      <div className="p-6 pt-4 flex justify-end bg-slate-900 flex-shrink-0 z-50 border-t border-white/5 fixed bottom-0 w-full">
+        {!showAnswer ? (
+          <button onClick={() => setShowAnswer(true)} className="px-8 py-4 rounded-xl font-bold text-xl shadow-lg bg-white text-indigo-900 hover:bg-indigo-50 hover:shadow-indigo-500/25 transition-all flex items-center gap-2">
+             <Play className="w-5 h-5" /> Rätta Nu / Visa Svar
+          </button>
+        ) : (
+          <button onClick={() => { setShowAnswer(false); dispatch({ type: 'NEXT_QUESTION' }); }} className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-xl hover:bg-indigo-500 shadow-lg flex items-center gap-2 transition-all">
+            Nästa <ArrowRight />
+          </button>
+        )}
+      </div>
+
+      {/* Image Zoom Modal */}
+      {zoomImage && (
+        <div 
+            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
+            onClick={() => setZoomImage(null)}
+        >
+            <img src={zoomImage} alt="Zoomed question" className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
+            <button className="absolute top-4 right-4 text-white/50 hover:text-white p-2"><X className="w-8 h-8" /></button>
+        </div>
+      )}
+
+      {showExitConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+              <div className="bg-white p-6 rounded-2xl shadow-2xl text-slate-900 max-w-sm w-full animate-fade-in text-center">
+                  <h3 className="text-xl font-bold mb-2">Avsluta Quizet?</h3>
+                  <p className="text-slate-500 mb-6">Detta kommer att avsluta omgången för alla elever och visa resultaten.</p>
+                  <div className="flex gap-3">
+                      <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">Nej, fortsätt</button>
+                      <button onClick={() => dispatch({ type: 'END_GAME' })} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg">Ja, avsluta</button>
+                  </div>
+              </div>
+          </div>
+      )}
+    </div>
+  );
+};
+
+// ==================================================================================
+// --- 10. HUVUDAPPEN (MAIN APP SHELL) ---
+// ==================================================================================
+
+export default function App() {
+  const [state, dispatch] = useReducer(gameReducer, initialState);
+  const renderToolbar = () => (<div className="fixed bottom-4 right-4 bg-black/50 backdrop-blur text-white p-2 rounded-lg shadow-2xl flex gap-2 z-50 text-[10px] border border-white/10 opacity-50 hover:opacity-100 transition-opacity"><button onClick={() => dispatch({type: 'RESET_APP'})} className="px-2 py-1 bg-gray-700 rounded">Reset</button></div>);
+  
+  const renderView = () => {
+    if (state.session.status === 'finished' && ['student_game', 'student_lobby'].includes(state.view)) {
+        return <StudentFinished player={state.currentPlayer} dispatch={dispatch} />;
+    }
+
+    switch (state.view) {
+      case 'landing': return <LandingPage dispatch={dispatch} />;
+      case 'teacher_auth': return <TeacherLogin dispatch={dispatch} />;
+      case 'teacher_dashboard': return <TeacherDashboard state={state} dispatch={dispatch} />;
+      case 'teacher_editor': return <QuizEditor quizToEdit={state.savedQuizzes[state.editingQuizIndex]} categories={state.categories} dispatch={dispatch} />;
+      case 'teacher_lobby': return <TeacherLobby session={state.session} dispatch={dispatch} />;
+      case 'teacher_game': 
+        if (state.session.settings.gameMode === 'jeopardy') return <TeacherJeopardy session={state.session} dispatch={dispatch} />; 
+        return <TeacherLiveGame session={state.session} dispatch={dispatch} />;
+      case 'teacher_solo_share': return <TeacherSoloShare session={state.session} dispatch={dispatch} />;
+      case 'student_login': return <StudentLogin session={state.session} dispatch={dispatch} />;
+      case 'student_lobby': return <StudentLobby currentPlayer={state.currentPlayer} dispatch={dispatch} />;
+      case 'student_game': return <StudentGame session={state.session} player={state.currentPlayer} dispatch={dispatch} />;
+      default: return <div className="p-10">Unknown View: {state.view}</div>;
+    }
+  };
+
+  return (
+    <div className="font-sans bg-slate-50 min-h-screen text-slate-900">
+      {renderView()}
+      {renderToolbar()}
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes float-up {
+            0% { transform: translateY(100px) scale(0.5); opacity: 0; }
+            10% { opacity: 1; }
+            100% { transform: translateY(-80vh) scale(1.5); opacity: 0; }
+        }
+        .animate-float-up {
+            animation: float-up 3s ease-out forwards;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+      `}} />
+    </div>
+  );
+}
