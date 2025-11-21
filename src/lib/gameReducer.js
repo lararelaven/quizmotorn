@@ -260,7 +260,13 @@ export const gameReducer = (state, action) => {
                 ...state,
                 currentPlayer: { ...state.currentPlayer, score: action.payload }
             };
-        case 'RESET_APP': return { ...state, view: 'teacher_dashboard', session: initialState.session };
+        case 'RESET_APP':
+            return {
+                ...state,
+                view: state.user ? 'teacher_dashboard' : 'landing',
+                session: initialState.session,
+                currentPlayer: null
+            };
         case 'LOGOUT': return initialState;
         default: return state;
     }

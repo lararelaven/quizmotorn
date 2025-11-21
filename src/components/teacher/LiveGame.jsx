@@ -127,6 +127,38 @@ export default function TeacherLiveGame({ session, dispatch }) {
         }
     }, [showAnswer]);
 
+    // --- NYTT: Hämta slutgiltiga poäng när spelet är slut ---
+    useEffect(() => {
+        if (isFinished) {
+            fetchTopPlayers();
+            import('canvas-confetti').then((confetti) => {
+                const duration = 3000;
+                const end = Date.now() + duration;
+
+                (function frame() {
+                    confetti.default({
+                        particleCount: 5,
+                        angle: 60,
+                        spread: 55,
+                        origin: { x: 0 },
+                        colors: ['#6366f1', '#ec4899', '#eab308']
+                    });
+                    confetti.default({
+                        particleCount: 5,
+                        angle: 120,
+                        spread: 55,
+                        origin: { x: 1 },
+                        colors: ['#6366f1', '#ec4899', '#eab308']
+                    });
+
+                    if (Date.now() < end) {
+                        requestAnimationFrame(frame);
+                    }
+                }());
+            });
+        }
+    }, [isFinished]);
+
     const getTimerColor = (current, total) => {
         const percentage = (current / total) * 100;
         if (percentage > 60) return 'bg-green-500';
@@ -135,22 +167,78 @@ export default function TeacherLiveGame({ session, dispatch }) {
     };
 
     if (isFinished) {
+        const sortedPlayers = [...(topPlayers.length > 0 ? topPlayers : session.players || [])]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 3);
+
         return (
-            <div className="flex flex-col h-screen items-center justify-center bg-slate-900 text-white p-8">
-                <Trophy className="w-24 h-24 text-yellow-400 mb-6" />
-                <h1 className="text-6xl font-black mb-12">Resultat</h1>
-                <div className="w-full max-w-2xl space-y-4">
-                    {[...(session.players || [])].sort((a, b) => b.score - a.score).slice(0, 5).map((p, i) => (
-                        <div key={p.id} className="flex justify-between items-center bg-white/10 p-6 rounded-xl border border-white/20">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">{i + 1}</div>
-                                <span className="text-2xl font-bold">{p.name}</span>
+            <div className="flex flex-col h-screen items-center justify-center bg-slate-900 text-white p-8 overflow-hidden relative">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 animate-pulse"></div>
+
+                <Trophy className="w-32 h-32 text-yellow-400 mb-8 animate-bounce drop-shadow-[0_0_35px_rgba(250,204,21,0.6)]" />
+                <h1 className="text-7xl font-black mb-16 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 drop-shadow-sm">Resultat</h1>
+
+                <div className="flex items-end justify-center gap-4 md:gap-8 w-full max-w-4xl mb-12 perspective-1000">
+                    {/* 2nd Place */}
+                    {sortedPlayers[1] && (
+                        <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                            <div className="mb-4 text-center">
+                                <span className="block text-2xl font-bold text-slate-300">{sortedPlayers[1].name}</span>
+                                <span className="block text-xl font-mono text-slate-400">{sortedPlayers[1].score} p</span>
                             </div>
-                            <span className="text-2xl font-mono">{p.score} p</span>
+                            <div className="w-24 md:w-32 h-40 bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-lg flex items-end justify-center pb-4 shadow-2xl border-t border-white/20 relative group">
+                                <span className="text-5xl font-black text-white/20 group-hover:text-white/40 transition-colors">2</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 1st Place */}
+                    {sortedPlayers[0] && (
+                        <div className="flex flex-col items-center z-10 animate-slide-up">
+                            <div className="mb-6 text-center">
+                                <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-2 animate-pulse" />
+                                <span className="block text-4xl font-black text-yellow-400 drop-shadow-md">{sortedPlayers[0].name}</span>
+                                <span className="block text-3xl font-mono text-yellow-200 font-bold">{sortedPlayers[0].score} p</span>
+                            </div>
+                            <div className="w-32 md:w-40 h-56 bg-gradient-to-t from-yellow-600 to-yellow-400 rounded-t-lg flex items-end justify-center pb-6 shadow-[0_0_50px_rgba(234,179,8,0.4)] border-t border-white/30 relative group">
+                                <span className="text-7xl font-black text-white/30 group-hover:text-white/50 transition-colors">1</span>
+                                <div className="absolute inset-0 bg-white/10 animate-pulse rounded-t-lg"></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 3rd Place */}
+                    {sortedPlayers[2] && (
+                        <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.4s' }}>
+                            <div className="mb-4 text-center">
+                                <span className="block text-2xl font-bold text-slate-300">{sortedPlayers[2].name}</span>
+                                <span className="block text-xl font-mono text-slate-400">{sortedPlayers[2].score} p</span>
+                            </div>
+                            <div className="w-24 md:w-32 h-32 bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg flex items-end justify-center pb-4 shadow-2xl border-t border-white/20 relative group">
+                                <span className="text-5xl font-black text-white/20 group-hover:text-white/40 transition-colors">3</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="w-full max-w-2xl space-y-2 mb-12 px-4">
+                    {sortedPlayers.slice(3).map((p, i) => (
+                        <div key={p.id || i} className="flex justify-between items-center bg-white/5 p-4 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
+                            <div className="flex items-center gap-4">
+                                <div className="w-8 h-8 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-sm">{i + 4}</div>
+                                <span className="text-xl font-medium text-slate-200">{p.name}</span>
+                            </div>
+                            <span className="text-xl font-mono text-slate-400">{p.score} p</span>
                         </div>
                     ))}
                 </div>
-                <button onClick={() => dispatch({ type: 'RESET_APP' })} className="mt-12 px-8 py-3 bg-white text-slate-900 rounded-lg font-bold hover:bg-gray-100">Avsluta Session</button>
+
+                <button
+                    onClick={() => dispatch({ type: 'RESET_APP' })}
+                    className="px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all duration-300 flex items-center gap-2"
+                >
+                    <StopCircle className="w-6 h-6" /> Avsluta Session
+                </button>
             </div>
         );
     }

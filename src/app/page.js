@@ -66,59 +66,93 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- NYTT: Spara session vid ändring ---
+  // --- NYTT: Spara session vid ändring (Lärare & Student) ---
   useEffect(() => {
+    // Spara lärarens session
     if (state.session?.id && ['teacher_lobby', 'teacher_game'].includes(state.view)) {
       localStorage.setItem('teacher_session_id', state.session.id);
     }
-  }, [state.session?.id, state.view]);
+    // Spara studentens session
+    if (state.session?.id && state.currentPlayer?.id) {
+      localStorage.setItem('student_session_id', state.session.id);
+      localStorage.setItem('student_player_id', state.currentPlayer.id);
+    }
+  }, [state.session?.id, state.view, state.currentPlayer?.id]);
 
-  // --- NYTT: Återställ session vid refresh ---
+  // --- NYTT: Återställ session vid refresh (Lärare & Student) ---
   useEffect(() => {
     const restoreSession = async () => {
-      const savedSessionId = localStorage.getItem('teacher_session_id');
-      if (!savedSessionId || state.session.id) return; // Redan laddat eller inget att ladda
+      // 1. Kolla URL först (t.ex. ?session=UUID)
+      const params = new URLSearchParams(window.location.search);
+      const urlSessionId = params.get('session');
 
-      console.log("Försöker återställa session:", savedSessionId);
+      // 2. Kolla LocalStorage
+      const teacherSessionId = localStorage.getItem('teacher_session_id');
+      const studentSessionId = localStorage.getItem('student_session_id');
+      const studentPlayerId = localStorage.getItem('student_player_id');
+
+      // Prioritera URL, sen lärare, sen student
+      const targetSessionId = urlSessionId || teacherSessionId || studentSessionId;
+
+      if (!targetSessionId || state.session.id) return;
+
+      console.log("Försöker återställa session:", targetSessionId);
 
       const { data: sessionData, error } = await supabase
         .from('sessions')
-        .select('*, quiz:quiz_id(*)') // Hämta även quiz-data!
-        .eq('id', savedSessionId)
+        .select('*, quiz:quiz_id(*)')
+        .eq('id', targetSessionId)
         .single();
 
       if (error || !sessionData) {
         console.error("Kunde inte återställa session:", error);
-        localStorage.removeItem('teacher_session_id');
+        // Rensa ogiltig data om vi försökte använda den
+        if (teacherSessionId === targetSessionId) localStorage.removeItem('teacher_session_id');
+        if (studentSessionId === targetSessionId) {
+          localStorage.removeItem('student_session_id');
+          localStorage.removeItem('student_player_id');
+        }
         return;
       }
 
-      // Mappa quiz-data korrekt (samma logik som i StudentLogin)
-      // Prioritera snapshot i settings, sen quiz_snapshot, sen joinad quiz
+      // Mappa quiz-data
       const quizData = sessionData.settings?.quizDataSnapshot || sessionData.quiz_snapshot || sessionData.quiz;
 
-      if (!quizData) {
-        console.error("Ingen quizdata hittades för sessionen");
+      if (!quizData) return;
+
+      const fullSession = { ...sessionData, quizData };
+
+      // A. Återställ Lärare (Om vi har teacherSessionId eller om vi är inloggade och URL matchar)
+      // Vi litar på teacherSessionId i localStorage för enkelhetens skull
+      if (teacherSessionId === targetSessionId) {
+        let targetView = 'teacher_lobby';
+        if (sessionData.status === 'active') targetView = 'teacher_game';
+        if (sessionData.status === 'finished') targetView = 'teacher_dashboard';
+
+        dispatch({
+          type: 'RESTORE_TEACHER_SESSION',
+          payload: { session: fullSession, view: targetView }
+        });
         return;
       }
 
-      const fullSession = {
-        ...sessionData,
-        quizData: quizData
-      };
+      // B. Återställ Student
+      if (studentPlayerId && (studentSessionId === targetSessionId || urlSessionId === targetSessionId)) {
+        const { data: player } = await supabase
+          .from('players')
+          .select('*')
+          .eq('id', studentPlayerId)
+          .single();
 
-      // Bestäm vilken vy vi ska till baserat på status
-      let targetView = 'teacher_lobby';
-      if (sessionData.status === 'active') targetView = 'teacher_game';
-      if (sessionData.status === 'finished') targetView = 'teacher_dashboard';
+        if (player) {
+          dispatch({ type: 'STUDENT_JOIN_SESSION', payload: { session: fullSession, player } });
 
-      dispatch({
-        type: 'RESTORE_TEACHER_SESSION',
-        payload: {
-          session: fullSession,
-          view: targetView
+          // Om spelet är igång, hoppa direkt in
+          if (sessionData.status === 'active') {
+            dispatch({ type: 'STUDENT_START_GAME' });
+          }
         }
-      });
+      }
     };
 
     restoreSession();
@@ -166,6 +200,9 @@ export default function Home() {
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide-up { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slide-up { animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .perspective-1000 { perspective: 1000px; }
       `}} />
     </div>
   );
