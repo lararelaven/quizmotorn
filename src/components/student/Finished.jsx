@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
 import { Trophy, Star, Home, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function StudentFinished({ player, dispatch }) {
 
@@ -13,6 +14,29 @@ export default function StudentFinished({ player, dispatch }) {
     };
 
     const feedback = getFeedback();
+
+    // Lyssna på om läraren stänger sessionen helt
+    React.useEffect(() => {
+        if (!player.session_id) return;
+
+        const channel = supabase
+            .channel('session_status_check')
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${player.session_id}` },
+                (payload) => {
+                    if (payload.new.status === 'closed') {
+                        // Rensa sessionen lokalt och gå till start
+                        localStorage.removeItem('student_session_id');
+                        localStorage.removeItem('student_player_id');
+                        dispatch({ type: 'RESET_APP' });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => supabase.removeChannel(channel);
+    }, [player.session_id, dispatch]);
 
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center animate-fade-in overflow-hidden relative">

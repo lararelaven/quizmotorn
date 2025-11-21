@@ -95,8 +95,8 @@ export default function TeacherLiveGame({ session, dispatch }) {
     };
 
     const handleEndGame = async () => {
-        // Uppdatera status i DB så eleverna ser resultat-skärmen
-        await supabase.from('sessions').update({ status: 'finished' }).eq('id', session.id);
+        // Uppdatera status i DB till 'closed' för att signalera att sessionen är helt slut
+        await supabase.from('sessions').update({ status: 'closed' }).eq('id', session.id);
         dispatch({ type: 'END_GAME' });
     };
     // --------------------------------

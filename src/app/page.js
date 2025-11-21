@@ -98,27 +98,6 @@ export default function Home() {
 
       console.log("Försöker återställa session:", targetSessionId);
 
-      const { data: sessionData, error } = await supabase
-        .from('sessions')
-        .select('*, quiz:quiz_id(*)')
-        .eq('id', targetSessionId)
-        .single();
-
-      if (error || !sessionData) {
-        console.error("Kunde inte återställa session:", error);
-        // Rensa ogiltig data om vi försökte använda den
-        if (teacherSessionId === targetSessionId) localStorage.removeItem('teacher_session_id');
-        if (studentSessionId === targetSessionId) {
-          localStorage.removeItem('student_session_id');
-          localStorage.removeItem('student_player_id');
-        }
-        return;
-      }
-
-      // Mappa quiz-data
-      const quizData = sessionData.settings?.quizDataSnapshot || sessionData.quiz_snapshot || sessionData.quiz;
-
-      if (!quizData) return;
 
       const fullSession = { ...sessionData, quizData };
 
