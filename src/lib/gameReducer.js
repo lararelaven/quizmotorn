@@ -42,7 +42,10 @@ export const gameReducer = (state, action) => {
             return {
                 ...state,
                 view: action.payload.view,
-                session: action.payload.session
+                session: {
+                    ...action.payload.session,
+                    players: action.payload.session.players || [] // Ensure players is always an array
+                }
             };
         case 'SET_QUIZZES': {
             const loadedQuizzes = action.payload;
@@ -179,12 +182,13 @@ export const gameReducer = (state, action) => {
         }
         case 'ADD_PLAYER': // Bytte namn för att vara tydlig (samma som PLAYER_JOIN)
             // Kolla så vi inte lägger till samma spelare två gånger
-            if (state.session.players.find(p => p.id === action.payload.id)) return state;
+            const currentPlayers = state.session.players || [];
+            if (currentPlayers.find(p => p.id === action.payload.id)) return state;
             return {
                 ...state,
                 session: {
                     ...state.session,
-                    players: [...state.session.players, { ...action.payload, lastAnsweredQuestionIndex: -1 }]
+                    players: [...currentPlayers, { ...action.payload, lastAnsweredQuestionIndex: -1 }]
                 }
             };
         case 'STUDENT_START_GAME':
