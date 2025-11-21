@@ -71,11 +71,14 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
         // 2. Skicka signal till databasen (Elevernas skärmar byter nu!)
         const nextIndex = session.currentQuestionIndex + 1;
+        const isLastQuestion = nextIndex >= session.quizData.questions.length;
+
         await supabase
             .from('sessions')
             .update({
                 current_question_index: nextIndex,
-                settings: { ...session.settings, showAnswer: false } // Göm svar för elever
+                settings: { ...session.settings, showAnswer: false }, // Göm svar för elever
+                ...(isLastQuestion && { status: 'finished' })
             })
             .eq('id', session.id);
     };
