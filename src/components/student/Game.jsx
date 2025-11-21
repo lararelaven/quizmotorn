@@ -89,7 +89,7 @@ export default function StudentGame({ session, player, dispatch }) {
         }
     };
 
-    // --- ANSWER REVEALED VIEW (Teacher shows correct answer) ---
+    // --- ANSWER REVEALED VIEW (Teacher shows correct answer and student answered) ---
     if (showAnswer && hasAnswered) {
         const isCorrect = selectedOption === question.correctAnswerIndex;
         return (
@@ -103,6 +103,44 @@ export default function StudentGame({ session, player, dispatch }) {
                     <p className="text-slate-400 text-xl">
                         {isCorrect ? `+${session.settings.scoreMode === 'speed' ? 1000 : 100} poäng` : 'Inga poäng denna gång'}
                     </p>
+                </div>
+
+                <div className="bg-slate-800 px-6 py-4 rounded-xl border border-slate-700">
+                    <span className="text-slate-400 uppercase text-xs font-bold tracking-wider">Din totala poäng</span>
+                    <div className="text-3xl font-black text-white">{player.score || 0}</div>
+                </div>
+
+                <div className="flex gap-2 items-center bg-black/30 px-4 py-2 rounded-lg mt-8">
+                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                    <span className="text-sm font-mono text-indigo-300">Väntar på nästa fråga...</span>
+                </div>
+            </div>
+        );
+    }
+
+    // --- MISSED QUESTION VIEW (Teacher revealed answer, but student didn't answer in time) ---
+    if (showAnswer && !hasAnswered) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
+                <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl bg-orange-500">
+                    <Frown className="w-16 h-16 text-white" />
+                </div>
+
+                <div>
+                    <h1 className="text-4xl font-black mb-2">Missad fråga!</h1>
+                    <p className="text-slate-400 text-xl">
+                        Du hann inte svara i tid
+                    </p>
+                </div>
+
+                <div className="bg-slate-800 px-6 py-4 rounded-xl border border-slate-700">
+                    <span className="text-slate-400 uppercase text-xs font-bold tracking-wider">Det rätta svaret var</span>
+                    <div className="text-3xl font-black text-white mt-2 flex items-center justify-center gap-3">
+                        <span className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shadow-lg bg-gradient-to-br ${gradients[question.correctAnswerIndex % 4]}`}>
+                            {letters[question.correctAnswerIndex]}
+                        </span>
+                        <span>{question.options[question.correctAnswerIndex]}</span>
+                    </div>
                 </div>
 
                 <div className="bg-slate-800 px-6 py-4 rounded-xl border border-slate-700">
