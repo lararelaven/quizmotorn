@@ -234,8 +234,11 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 </div>
 
                 <button
-                    onClick={() => dispatch({ type: 'RESET_APP' })}
-                    className="px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all duration-300 flex items-center gap-2"
+                    onClick={() => {
+                        localStorage.removeItem('teacher_session_id');
+                        dispatch({ type: 'RESET_APP' });
+                    }}
+                    className="relative z-50 px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all duration-300 flex items-center gap-2"
                 >
                     <StopCircle className="w-6 h-6" /> Avsluta Session
                 </button>
