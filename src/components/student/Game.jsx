@@ -20,6 +20,19 @@ export default function StudentGame({ session, player, dispatch }) {
         return <div className="text-white text-center p-10">Laddar quizdata...</div>;
     }
 
+    // Check if quiz is finished (questionIndex out of bounds)
+    if (questionIndex >= session.quizData.questions.length) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8">
+                <Loader2 className="w-16 h-16 animate-spin text-indigo-400" />
+                <div>
+                    <h1 className="text-3xl font-black mb-2">Quizet är slut!</h1>
+                    <p className="text-slate-400 text-lg">Laddar resultat...</p>
+                </div>
+            </div>
+        );
+    }
+
     const question = session.quizData.questions[questionIndex];
     const showAnswer = session.settings?.showAnswer || false;
 
