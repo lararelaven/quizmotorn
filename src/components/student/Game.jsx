@@ -3,6 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { Check, Loader2, Trophy, Frown, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
+// Constants for answer options
+const letters = ['A', 'B', 'C', 'D'];
+const gradients = [
+    'from-pink-500 to-rose-500',
+    'from-blue-500 to-cyan-500',
+    'from-amber-500 to-orange-500',
+    'from-purple-500 to-indigo-500'
+];
+
 export default function StudentGame({ session, player, dispatch }) {
     const questionIndex = session?.current_question_index ?? 0;
 
@@ -74,25 +83,19 @@ export default function StudentGame({ session, player, dispatch }) {
 
             setHasAnswered(true);
             dispatch({ type: 'UPDATE_PLAYER_SCORE', payload: newScore });
-
-        } catch (err) {
-            console.error("Kunde inte spara svar:", err);
+        } catch (error) {
+            console.error('Error submitting answer:', error);
             setIsSending(false);
         }
     };
 
-    const letters = ['A', 'B', 'C', 'D'];
-    const gradients = ['from-pink-500 to-rose-600', 'from-blue-500 to-cyan-600', 'from-yellow-400 to-orange-500', 'from-purple-500 to-indigo-600'];
-
-    if (!question) return <div className="text-white text-center p-10">Laddar fråga...</div>;
-
-    // --- RESULT VIEW (Teacher clicked "Rätta Nu") ---
+    // --- ANSWER REVEALED VIEW (Teacher shows correct answer) ---
     if (showAnswer && hasAnswered) {
         const isCorrect = selectedOption === question.correctAnswerIndex;
         return (
             <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
-                <div className={`w-32 h-32 rounded-full flex items-center justify-center border-8 shadow-2xl ${isCorrect ? 'bg-green-500/20 border-green-500' : 'bg-red-500/20 border-red-500'}`}>
-                    {isCorrect ? <Check className="w-16 h-16 text-green-500" /> : <X className="w-16 h-16 text-red-500" />}
+                <div className={`w-24 h-24 rounded-full flex items-center justify-center shadow-2xl ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}>
+                    {isCorrect ? <Check className="w-16 h-16 text-white" /> : <X className="w-16 h-16 text-white" />}
                 </div>
 
                 <div>
