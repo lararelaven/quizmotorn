@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Plus, Bot, Copy, BookOpen, Edit2, Trash2, Smartphone, Grid,
     Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight, AlertTriangle, Save, Loader2
@@ -9,6 +10,7 @@ import { generateTeamNames, generatePin } from '../../lib/utils';
 import { supabase } from '@/lib/supabase';
 
 export default function TeacherDashboard({ state, dispatch }) {
+    const router = useRouter();
     const [jsonInput, setJsonInput] = useState("");
     const [error, setError] = useState('');
     const [jeopardyConfig, setJeopardyConfig] = useState(null);
@@ -202,15 +204,11 @@ export default function TeacherDashboard({ state, dispatch }) {
         const result = await createSessionInDb(liveConfig.quiz, 'live', settings);
         if (!result) return;
 
-        dispatch({
-            type: 'CREATE_SESSION',
-            payload: {
-                sessionId: result.sessionData.id,
-                pinCode: result.pinCode,
-                quizData: liveConfig.quiz,
-                settings: settings
-            }
-        });
+        // Navigera till host-sidan (UUID)
+        const targetUrl = `/host/${result.sessionData.id}`;
+        console.log("Navigerar till:", targetUrl);
+        router.push(targetUrl);
+
         setLiveConfig(null);
     }
     // -----------------------------------------
