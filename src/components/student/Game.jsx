@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Loader2, Trophy, Frown, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import StudentFinished from './Finished';
 
 // Constants for answer options
 const letters = ['A', 'B', 'C', 'D'];
@@ -20,17 +21,9 @@ export default function StudentGame({ session, player, dispatch }) {
         return <div className="text-white text-center p-10">Laddar quizdata...</div>;
     }
 
-    // Check if quiz is finished (questionIndex out of bounds)
-    if (questionIndex >= session.quizData.questions.length) {
-        return (
-            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8">
-                <Loader2 className="w-16 h-16 animate-spin text-indigo-400" />
-                <div>
-                    <h1 className="text-3xl font-black mb-2">Quizet är slut!</h1>
-                    <p className="text-slate-400 text-lg">Laddar resultat...</p>
-                </div>
-            </div>
-        );
+    // Check if quiz is finished (questionIndex out of bounds OR status is finished)
+    if (questionIndex >= session.quizData.questions.length || session.status === 'finished') {
+        return <StudentFinished player={player} dispatch={dispatch} />;
     }
 
     const question = session.quizData.questions[questionIndex];
