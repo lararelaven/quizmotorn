@@ -63,6 +63,21 @@ export default function StudentGame({ session, player, dispatch }) {
         };
     }, [session.id, dispatch]);
 
+    // --- PREVIEW VIEW (Get Ready) ---
+    if (session.settings?.question_state === 'preview') {
+        return (
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
+                <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl bg-indigo-600 animate-pulse">
+                    <Loader2 className="w-12 h-12 text-white animate-spin" />
+                </div>
+                <div>
+                    <h1 className="text-4xl font-black mb-4">Gör dig redo!</h1>
+                    <p className="text-slate-400 text-xl max-w-2xl mx-auto">{question.question}</p>
+                </div>
+            </div>
+        );
+    }
+
     const handleAnswer = async (optionIndex) => {
         if (hasAnswered || isSending) return;
 
@@ -74,7 +89,24 @@ export default function StudentGame({ session, player, dispatch }) {
             currentAnswers[questionIndex] = optionIndex;
 
             const isCorrect = optionIndex === question.correctAnswerIndex;
-            const points = isCorrect ? (session.settings.scoreMode === 'speed' ? 1000 : 100) : 0;
+            let points = 0;
+
+            if (isCorrect) {
+                if (session.settings.scoreMode === 'speed' && session.settings.question_start_time) {
+                    const now = Date.now();
+                    const startTime = session.settings.question_start_time;
+                    const duration = (session.settings.timerDuration || 30) * 1000;
+                    const elapsed = Math.max(0, now - startTime);
+
+                    // Linjär poängminskning: 1000 -> 100
+                    const percentageLeft = Math.max(0, (duration - elapsed) / duration);
+                    points = Math.round(100 + (900 * percentageLeft));
+                } else {
+                    // Enkel poängsättning eller fallback
+                    points = session.settings.scoreMode === 'speed' ? 1000 : 100;
+                }
+            }
+
             const newScore = (player.score || 0) + points;
 
             const { error } = await supabase
@@ -107,7 +139,7 @@ export default function StudentGame({ session, player, dispatch }) {
                 <div>
                     <h1 className="text-4xl font-black mb-2">{isCorrect ? 'Rätt svar!' : 'Tyvärr, fel svar.'}</h1>
                     <p className="text-slate-400 text-xl">
-                        {isCorrect ? `+${session.settings.scoreMode === 'speed' ? 1000 : 100} poäng` : 'Inga poäng denna gång'}
+                        {isCorrect ? `+${(player.score - (player.prevScore || player.score))} poäng` : 'Inga poäng denna gång'}
                     </p>
                 </div>
 

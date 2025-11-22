@@ -48,7 +48,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
         fetchTopPlayers(); // Hämta initialt
 
-        return () => supabase.removeChannel(channel);
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [session.currentQuestionIndex, session.id]);
 
     const fetchTopPlayers = async () => {
@@ -66,21 +68,51 @@ export default function TeacherLiveGame({ session, dispatch }) {
     const handleNextQuestion = async () => {
         setShowAnswer(false);
 
-        // 1. Uppdatera lokalt state
-        dispatch({ type: 'NEXT_QUESTION' });
-
-        // 2. Skicka signal till databasen (Elevernas skärmar byter nu!)
+        // 1. Förhandsvisning (Preview Phase)
         const nextIndex = session.currentQuestionIndex + 1;
         const isLastQuestion = nextIndex >= session.quizData.questions.length;
 
+        // Uppdatera lokalt direkt för snabb UI-respons
+        dispatch({ type: 'NEXT_QUESTION' });
+        dispatch({
+            type: 'UPDATE_SESSION',
+            payload: {
+                settings: { ...session.settings, question_state: 'preview', showAnswer: false }
+            }
+        });
+
+        // Uppdatera DB till 'preview'
         await supabase
             .from('sessions')
             .update({
                 current_question_index: nextIndex,
-                settings: { ...session.settings, showAnswer: false }, // Göm svar för elever
+                settings: { ...session.settings, question_state: 'preview', showAnswer: false },
                 ...(isLastQuestion && { status: 'finished' })
             })
             .eq('id', session.id);
+
+        if (isLastQuestion) return;
+
+        // 2. Vänta 3 sekunder (Get Ready!)
+        setTimeout(async () => {
+            const startTime = Date.now();
+
+            // Uppdatera lokalt
+            dispatch({
+                type: 'UPDATE_SESSION',
+                payload: {
+                    settings: { ...session.settings, question_state: 'answering', question_start_time: startTime }
+                }
+            });
+
+            // Uppdatera DB till 'answering'
+            await supabase
+                .from('sessions')
+                .update({
+                    settings: { ...session.settings, question_state: 'answering', question_start_time: startTime }
+                })
+                .eq('id', session.id);
+        }, 3000);
     };
 
     const handleShowAnswer = async () => {
@@ -117,16 +149,26 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     useEffect(() => {
         if (!session.settings.timerEnabled || showAnswer || isFinished || timeLeft === null) return;
+
+        // Om vi är i preview-läget, pausa timern eller sätt den till max
+        if (session.settings.question_state === 'preview') {
+            setTimeLeft(session.settings.timerDuration);
+            return;
+        }
+
         if (timeLeft <= 0) {
             handleShowAnswer();
             return;
         }
         const timerId = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
         return () => clearInterval(timerId);
-    }, [timeLeft, showAnswer, isFinished, session.settings.timerEnabled]);
+    }, [timeLeft, showAnswer, isFinished, session.settings.timerEnabled, session.settings.question_state]);
 
+    // Reset timer when question changes
     useEffect(() => {
-        if (session.settings.timerEnabled) setTimeLeft(session.settings.timerDuration);
+        if (session.settings.timerEnabled) {
+            setTimeLeft(session.settings.timerDuration);
+        }
         setShowAnswer(false);
     }, [session.currentQuestionIndex, session.settings.timerEnabled, session.settings.timerDuration]);
 
@@ -296,7 +338,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 {session.settings.timerEnabled && !showAnswer && (
                     <div className="w-full h-3 bg-slate-800 rounded-full mb-6 overflow-hidden relative shadow-inner">
                         <div
-                            className={`h-full transition-all duration-1000 ease-linear ${getTimerColor(timeLeft, session.settings.timerDuration)}`}
+                            className={`h-full ease-linear ${session.settings.question_state === 'preview' ? 'transition-none' : 'transition-all duration-1000'} ${getTimerColor(timeLeft, session.settings.timerDuration)}`}
                             style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
                         />
                     </div>
