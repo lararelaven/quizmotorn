@@ -92,7 +92,7 @@ export default function StudentGame({ session, player, dispatch }) {
             let points = 0;
 
             if (isCorrect) {
-                if (session.settings.scoreMode === 'speed' && session.settings.question_start_time) {
+                if (session.settings.timerEnabled && session.settings.scoreMode === 'speed' && session.settings.question_start_time) {
                     const now = Date.now();
                     const startTime = session.settings.question_start_time;
                     const duration = (session.settings.timerDuration || 30) * 1000;
@@ -102,8 +102,8 @@ export default function StudentGame({ session, player, dispatch }) {
                     const percentageLeft = Math.max(0, (duration - elapsed) / duration);
                     points = Math.round(100 + (900 * percentageLeft));
                 } else {
-                    // Enkel poängsättning eller fallback
-                    points = session.settings.scoreMode === 'speed' ? 1000 : 100;
+                    // Om ingen timer eller "enkelt" läge -> Alltid 1000 poäng
+                    points = 1000;
                 }
             }
 

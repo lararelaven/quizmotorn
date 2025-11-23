@@ -20,7 +20,7 @@ import StudentFinished from '@/components/student/Finished';
 export default function Home() {
   const [state, dispatch] = useReducer(gameReducer, initialState);
 
-  // --- NYTT: Global Auth Lyssnare ---
+  // --- Global Auth Lyssnare ---
   useEffect(() => {
     // 0. Kolla URL parametrar (för QR-kod)
     if (typeof window !== 'undefined') {
@@ -66,7 +66,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- NYTT: Spara session vid ändring (Lärare & Student) ---
+  // --- Spara session vid ändring (Lärare & Student) ---
   useEffect(() => {
     // Spara lärarens session
     if (state.session?.id && ['teacher_lobby', 'teacher_game'].includes(state.view)) {
@@ -79,7 +79,7 @@ export default function Home() {
     }
   }, [state.session?.id, state.view, state.currentPlayer?.id]);
 
-  // --- NYTT: Återställ session vid refresh (Lärare & Student) ---
+  // --- Återställ session vid refresh (Lärare & Student) ---
   useEffect(() => {
     const restoreSession = async () => {
       // 1. Kolla URL först (t.ex. ?session=UUID)
@@ -98,6 +98,29 @@ export default function Home() {
 
       console.log("Försöker återställa session:", targetSessionId);
 
+      // Hämta session från DB
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('sessions')
+        .select('*')
+        .eq('id', targetSessionId)
+        .single();
+
+      if (sessionError || !sessionData) {
+        console.error("Kunde inte hitta session:", sessionError);
+        return;
+      }
+
+      // Hämta quiz-data
+      const { data: quizData, error: quizError } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('id', sessionData.quiz_id)
+        .single();
+
+      if (quizError || !quizData) {
+        console.error("Kunde inte hitta quiz:", quizError);
+        return;
+      }
 
       const fullSession = { ...sessionData, quizData };
 

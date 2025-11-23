@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    UserCheck, StopCircle, Monitor, Play, ArrowRight, Trophy, Maximize2, X
+    UserCheck, StopCircle, Monitor, Play, ArrowRight, Trophy, Maximize2, X, CheckCircle, Loader2
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -62,57 +62,74 @@ export default function TeacherLiveGame({ session, dispatch }) {
             .limit(3);
         if (data) setTopPlayers(data);
     };
-    // ---------------------------------------
 
-    // --- NYTT: Databas-funktioner ---
+    // --- NYTT: Hantera Preview-fasen automatiskt via useEffect ---
+    useEffect(() => {
+        if (session.settings?.question_state === 'preview') {
+            const timer = setTimeout(async () => {
+                const startTime = Date.now();
+
+                // Uppdatera lokalt
+                dispatch({
+                    type: 'UPDATE_SESSION',
+                    payload: {
+                        settings: {
+                            ...session.settings,
+                            question_state: 'answering',
+                            question_start_time: startTime
+                        }
+                    }
+                });
+
+                // Uppdatera DB
+                await supabase
+                    .from('sessions')
+                    .update({
+                        settings: {
+                            ...session.settings,
+                            question_state: 'answering',
+                            question_start_time: startTime
+                        }
+                    })
+                    .eq('id', session.id);
+
+                // Starta timer-animationen
+                setTimeLeft(session.settings.timerDuration);
+
+            }, 4000); // 4 sekunders förberedelse
+
+            return () => clearTimeout(timer);
+        }
+    }, [session.settings?.question_state, session.id, dispatch, session.settings]);
+
+    // --- Databas-funktioner ---
     const handleNextQuestion = async () => {
         setShowAnswer(false);
 
-        // 1. Förhandsvisning (Preview Phase)
         const nextIndex = session.currentQuestionIndex + 1;
         const isLastQuestion = nextIndex >= session.quizData.questions.length;
+
+        // Bestäm nästa state baserat på om timer är aktiv
+        const nextState = session.settings.timerEnabled ? 'preview' : 'answering';
 
         // Uppdatera lokalt direkt för snabb UI-respons
         dispatch({ type: 'NEXT_QUESTION' });
         dispatch({
             type: 'UPDATE_SESSION',
             payload: {
-                settings: { ...session.settings, question_state: 'preview', showAnswer: false }
+                settings: { ...session.settings, question_state: nextState, showAnswer: false }
             }
         });
 
-        // Uppdatera DB till 'preview'
+        // Uppdatera DB
         await supabase
             .from('sessions')
             .update({
                 current_question_index: nextIndex,
-                settings: { ...session.settings, question_state: 'preview', showAnswer: false },
+                settings: { ...session.settings, question_state: nextState, showAnswer: false },
                 ...(isLastQuestion && { status: 'finished' })
             })
             .eq('id', session.id);
-
-        if (isLastQuestion) return;
-
-        // 2. Vänta 3 sekunder (Get Ready!)
-        setTimeout(async () => {
-            const startTime = Date.now();
-
-            // Uppdatera lokalt
-            dispatch({
-                type: 'UPDATE_SESSION',
-                payload: {
-                    settings: { ...session.settings, question_state: 'answering', question_start_time: startTime }
-                }
-            });
-
-            // Uppdatera DB till 'answering'
-            await supabase
-                .from('sessions')
-                .update({
-                    settings: { ...session.settings, question_state: 'answering', question_start_time: startTime }
-                })
-                .eq('id', session.id);
-        }, 3000);
     };
 
     const handleShowAnswer = async () => {
@@ -145,26 +162,29 @@ export default function TeacherLiveGame({ session, dispatch }) {
         // Tvinga navigering till dashboard
         window.location.href = '/';
     };
-    // --------------------------------
 
+    // Timer logic
     useEffect(() => {
-        if (!session.settings.timerEnabled || showAnswer || isFinished || timeLeft === null) return;
-
-        // Om vi är i preview-läget, pausa timern eller sätt den till max
-        if (session.settings.question_state === 'preview') {
+        if (session.settings?.question_state !== 'answering' || !session.settings.timerEnabled) {
             setTimeLeft(session.settings.timerDuration);
             return;
         }
 
-        if (timeLeft <= 0) {
+        if (timeLeft === null) return;
+
+        if (timeLeft === 0) {
             handleShowAnswer();
             return;
         }
-        const timerId = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
-        return () => clearInterval(timerId);
-    }, [timeLeft, showAnswer, isFinished, session.settings.timerEnabled, session.settings.question_state]);
 
-    // Reset timer when question changes
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [timeLeft, session.settings?.question_state, session.settings.timerEnabled]);
+
+    // Reset timer when question changes (fallback)
     useEffect(() => {
         if (session.settings.timerEnabled) {
             setTimeLeft(session.settings.timerDuration);
@@ -183,7 +203,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
         }
     }, [showAnswer]);
 
-    // --- NYTT: Hämta slutgiltiga poäng när spelet är slut ---
+    // --- Hämta slutgiltiga poäng när spelet är slut ---
     useEffect(() => {
         if (isFinished) {
             fetchTopPlayers();
@@ -299,120 +319,144 @@ export default function TeacherLiveGame({ session, dispatch }) {
         );
     }
 
-    if (!question) return <div className="text-white p-10">Laddar fråga...</div>;
+    if (!question) return <div className="text-white text-center p-10 flex flex-col items-center gap-4"><Loader2 className="animate-spin w-10 h-10" /><span>Laddar fråga...</span></div>;
+
+    const isPreview = session.settings?.question_state === 'preview';
 
     return (
-        <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
-            <div className="p-6 pb-0 flex-shrink-0">
-                <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center gap-4">
-                        <div className="bg-white/10 text-slate-300 px-4 py-2 rounded-full font-mono shadow-sm border border-white/10">
-                            Fråga {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
-                        </div>
-                        {!showAnswer && (
-                            <div className="flex items-center gap-2 bg-indigo-600/20 px-4 py-2 rounded-full border border-indigo-500/30 text-indigo-200">
-                                <UserCheck className="w-4 h-4" /> {answersCount} / {totalPlayers} svar
-                            </div>
-                        )}
+        <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
+            {/* Header */}
+            <div className="bg-slate-800/50 p-4 flex justify-between items-center border-b border-white/5 backdrop-blur-sm z-10">
+                <div className="flex items-center gap-4">
+                    <div className="bg-indigo-600 px-4 py-2 rounded-lg font-bold text-white shadow-lg">
+                        {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
                     </div>
-
-                    <div className="flex gap-4 items-center">
-                        {/* Leaderboard Mini */}
-                        <div className="hidden md:flex items-center gap-3 bg-black/20 px-4 py-2 rounded-xl border border-white/5">
-                            <Trophy className="w-4 h-4 text-yellow-400" />
-                            <div className="flex gap-3 text-xs font-bold">
-                                {topPlayers.map((p, i) => (
-                                    <div key={i} className="flex items-center gap-1">
-                                        <span className="text-slate-400">#{i + 1}</span>
-                                        <span className="text-white">{p.name}</span>
-                                        <span className="text-indigo-300">{p.score}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <button onClick={() => setShowExitConfirm(true)} className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 transition-colors font-bold text-sm"><StopCircle className="w-4 h-4" /> Avsluta</button>
-                    </div>
+                    <div className="text-slate-400 font-mono text-sm hidden md:block">PIN: {session.pin_code}</div>
                 </div>
 
-                {session.settings.timerEnabled && !showAnswer && (
-                    <div className="w-full h-3 bg-slate-800 rounded-full mb-6 overflow-hidden relative shadow-inner">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-slate-950/50 px-4 py-2 rounded-lg border border-white/5">
+                        <UserCheck className="w-5 h-5 text-green-400" />
+                        <span className="font-bold text-white">{answersCount}</span>
+                        <span className="text-slate-400 text-sm">svar</span>
+                    </div>
+                    <button
+                        onClick={() => setShowExitConfirm(true)}
+                        className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors"
+                    >
+                        <StopCircle className="w-6 h-6" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10">
+
+                {/* Question Card */}
+                <div className="w-full max-w-4xl mb-8 animate-slide-up">
+                    {question.image && (
+                        <div className="mb-6 relative group cursor-zoom-in" onClick={() => setZoomImage(question.image)}>
+                            <img
+                                src={question.image}
+                                alt="Question"
+                                className="w-full h-64 md:h-80 object-cover rounded-2xl shadow-2xl border border-white/10 group-hover:brightness-110 transition-all"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 rounded-2xl">
+                                <Maximize2 className="w-12 h-12 text-white drop-shadow-lg" />
+                            </div>
+                        </div>
+                    )}
+                    <h2 className="text-3xl md:text-5xl font-black text-white text-center leading-tight drop-shadow-xl">
+                        {question.question}
+                    </h2>
+                </div>
+
+                {/* Options Grid - HIDDEN DURING PREVIEW */}
+                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl transition-opacity duration-500 ${isPreview ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                    {question.options.map((opt, idx) => {
+                        const isCorrect = idx === question.correctAnswerIndex;
+                        const showResult = showAnswer;
+
+                        let bgClass = "bg-slate-800";
+                        if (showResult) {
+                            bgClass = isCorrect ? "bg-green-600 ring-4 ring-green-400/50 scale-[1.02] z-10" : "bg-slate-800 opacity-50 grayscale";
+                        }
+
+                        return (
+                            <div
+                                key={idx}
+                                className={`${bgClass} p-6 rounded-2xl border border-white/10 flex items-center gap-4 transition-all duration-500 shadow-xl relative overflow-hidden group`}
+                            >
+                                <div className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-xl font-black text-white shadow-lg bg-gradient-to-br ${['from-pink-500 to-rose-500', 'from-blue-500 to-cyan-500', 'from-amber-500 to-orange-500', 'from-purple-500 to-indigo-500'][idx % 4]}`}>
+                                    {['A', 'B', 'C', 'D'][idx]}
+                                </div>
+                                <span className="text-xl md:text-2xl font-bold text-white">{opt}</span>
+                                {showResult && isCorrect && <CheckCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 text-white animate-bounce" />}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Preview Indicator */}
+                {isPreview && (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-32">
+                        <div className="flex flex-col items-center gap-2 animate-pulse">
+                            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                            <span className="text-indigo-300 font-bold tracking-widest uppercase text-sm">Gör dig redo...</span>
+                        </div>
+                    </div>
+                )}
+
+            </div>
+
+            {/* Footer / Controls */}
+            <div className="bg-slate-900/80 backdrop-blur-md p-6 border-t border-white/5 z-20">
+                <div className="max-w-6xl mx-auto flex items-center justify-between gap-8">
+                    {/* Timer Bar */}
+                    <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden relative shadow-inner">
                         <div
-                            className={`h-full ease-linear ${session.settings.question_state === 'preview' ? 'transition-none' : 'transition-all duration-1000'} ${getTimerColor(timeLeft, session.settings.timerDuration)}`}
+                            className={`h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-[0_0_15px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' ? 'transition-all duration-1000 ease-linear' : 'transition-none'}`}
                             style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
                         />
                     </div>
-                )}
-            </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 flex flex-col items-center pt-8 pb-40">
-                <div className="max-w-6xl w-full flex flex-col items-center justify-start my-auto min-h-full">
-                    <h2 className="text-3xl md:text-5xl font-bold text-center mb-8 leading-tight drop-shadow-lg max-w-4xl">{question.question}</h2>
-
-                    {question.image && (
-                        <div className="mb-8 w-full flex justify-center">
-                            <div className="relative group cursor-zoom-in" onClick={() => setZoomImage(question.image)}>
-                                <img src={question.image} alt="Quiz question" className="max-h-[15vh] w-auto object-contain rounded-xl shadow-lg border border-white/10 transition-transform group-hover:scale-105" />
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 rounded-xl transition-opacity"><Maximize2 className="w-8 h-8 text-white drop-shadow-md" /></div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-8">
-                        {question.options.map((opt, idx) => {
-                            const isCorrect = idx === question.correctAnswerIndex;
-                            const letters = ['A', 'B', 'C', 'D'];
-                            const gradients = ['from-pink-500 to-rose-600', 'from-blue-500 to-cyan-600', 'from-yellow-400 to-orange-500', 'from-purple-500 to-indigo-600'];
-                            return (
-                                <div key={idx} className={`relative overflow-hidden rounded-2xl p-1 transition-all duration-300 ${showAnswer ? (isCorrect ? 'bg-gradient-to-r from-green-400 to-green-600 scale-105 shadow-[0_0_30px_rgba(74,222,128,0.5)]' : 'bg-slate-800 opacity-30 grayscale') : 'bg-slate-800 hover:bg-slate-700 hover:scale-[1.02] cursor-default'}`}>
-                                    <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-8 flex items-center gap-6 relative z-10">
-                                        <div className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>{letters[idx]}</div>
-                                        <span className="text-2xl font-bold text-white">{opt}</span>
-                                    </div>
-                                    {!showAnswer && <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />}
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {showAnswer && (
-                        <div className="w-full p-6 rounded-2xl mb-6 animate-fade-in border border-indigo-500/30 bg-indigo-900/20 backdrop-blur-md">
-                            <h3 className="font-bold mb-2 flex items-center gap-2 text-indigo-300 text-lg"><Monitor className="w-5 h-5" /> Fördjupning</h3>
-                            <p className="text-xl leading-relaxed text-indigo-100 font-light">{question.explanation}</p>
-                        </div>
+                    {/* Action Button */}
+                    {!showAnswer ? (
+                        <button
+                            onClick={() => setShowAnswer(true)}
+                            className="bg-white text-slate-900 px-8 py-3 rounded-xl font-black text-lg hover:bg-indigo-50 hover:scale-105 transition-all shadow-lg flex items-center gap-2 min-w-[200px] justify-center"
+                        >
+                            <Monitor className="w-5 h-5" /> Visa Svar
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleNextQuestion}
+                            className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-lg hover:bg-indigo-500 hover:scale-105 transition-all shadow-lg shadow-indigo-500/30 flex items-center gap-2 min-w-[200px] justify-center"
+                        >
+                            Nästa Fråga <ArrowRight className="w-5 h-5" />
+                        </button>
                     )}
                 </div>
             </div>
 
-            <div className="fixed bottom-8 right-8 z-50">
-                {!showAnswer ? (
-                    <button onClick={handleShowAnswer} className="px-8 py-4 rounded-xl font-bold text-xl shadow-2xl bg-white text-indigo-900 hover:bg-indigo-50 hover:shadow-indigo-500/50 hover:scale-105 transition-all flex items-center gap-2 border-4 border-indigo-100">
-                        <Play className="w-5 h-5" /> Rätta Nu / Visa Svar
-                    </button>
-                ) : (
-                    <button onClick={handleNextQuestion} className="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold text-xl hover:bg-indigo-500 hover:scale-105 shadow-2xl flex items-center gap-2 transition-all border-4 border-indigo-400/50">
-                        Nästa <ArrowRight />
-                    </button>
-                )}
-            </div>
-
-            {zoomImage && (
-                <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 cursor-zoom-out animate-fade-in" onClick={() => setZoomImage(null)}>
-                    <img src={zoomImage} alt="Zoomed question" className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
-                    <button className="absolute top-4 right-4 text-white/50 hover:text-white p-2"><X className="w-8 h-8" /></button>
+            {/* Exit Confirm Modal */}
+            {showExitConfirm && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center">
+                        <h3 className="text-2xl font-bold text-white mb-2">Avsluta sessionen?</h3>
+                        <p className="text-slate-400 mb-8">Alla deltagare kommer att kopplas bort.</p>
+                        <div className="flex gap-4">
+                            <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors">Avbryt</button>
+                            <button onClick={handleCloseSession} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all">Avsluta</button>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {showExitConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-                    <div className="bg-white p-6 rounded-2xl shadow-2xl text-slate-900 max-w-sm w-full animate-fade-in text-center">
-                        <h3 className="text-xl font-bold mb-2">Avsluta Quizet?</h3>
-                        <p className="text-slate-500 mb-6">Detta kommer att avsluta omgången för alla elever och visa resultaten.</p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">Nej, fortsätt</button>
-                            <button onClick={handleEndGame} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg">Ja, avsluta</button>
-                        </div>
-                    </div>
+            {/* Image Zoom Modal */}
+            {zoomImage && (
+                <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomImage(null)}>
+                    <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in duration-300" />
                 </div>
             )}
         </div>

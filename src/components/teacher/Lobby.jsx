@@ -50,12 +50,27 @@ export default function TeacherLobby({ session, dispatch }) {
     }, [session.id, dispatch]);
 
     const handleStartGame = async () => {
+        const initialState = session.settings.timerEnabled ? 'preview' : 'answering';
+
         await supabase
             .from('sessions')
-            .update({ status: 'active', current_question_index: 0 })
+            .update({
+                status: 'active',
+                current_question_index: 0,
+                settings: { ...session.settings, question_state: initialState }
+            })
             .eq('id', session.id);
 
         dispatch({ type: 'START_GAME' });
+        // Uppdatera lokalt session-objekt så att LiveGame får rätt startvärden direkt
+        dispatch({
+            type: 'UPDATE_SESSION',
+            payload: {
+                status: 'active',
+                current_question_index: 0,
+                settings: { ...session.settings, question_state: initialState }
+            }
+        });
     };
 
     const handleCopyLink = () => {
