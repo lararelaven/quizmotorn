@@ -62,7 +62,7 @@ export default function StudentGame({ session, player, dispatch }) {
         return () => clearInterval(timer);
     }, [timeLeft, session.settings?.question_state, session.settings.timerEnabled, showAnswer]);
 
-    // Realtime subscription
+    // Realtime subscription (Session updates AND Player Kick)
     useEffect(() => {
         const channel = supabase
             .channel(`student_game_${session.id}`)
@@ -78,12 +78,27 @@ export default function StudentGame({ session, player, dispatch }) {
                     dispatch({ type: 'UPDATE_SESSION', payload: payload.new });
                 }
             )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'DELETE',
+                    schema: 'public',
+                    table: 'players',
+                    filter: `id=eq.${player.id}`,
+                },
+                () => {
+                    // Player was kicked
+                    alert("Du har blivit borttagen från spelet.");
+                    dispatch({ type: 'RESET_APP' });
+                    window.location.href = '/';
+                }
+            )
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [session.id, dispatch]);
+    }, [session.id, dispatch, player.id]);
 
     // --- PREVIEW VIEW (Get Ready) ---
     // Ensure we check for 'preview' state specifically
@@ -264,26 +279,28 @@ export default function StudentGame({ session, player, dispatch }) {
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full">
+            <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full pb-[50vh] md:pb-0">
                 <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
 
-                <div className="grid grid-cols-2 gap-4 w-full">
+                {/* Options Grid - Mobile Optimized */}
+                <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent">
                     {question.options.map((opt, idx) => (
                         <button
                             key={idx}
                             onClick={() => handleAnswer(idx)}
                             disabled={isSending}
                             className={`
-                                relative overflow-hidden rounded-2xl p-1 transition-all duration-200
-                                ${isSending && selectedOption !== idx ? 'opacity-50 grayscale' : 'hover:scale-[1.02] active:scale-95'}
+                                relative overflow-hidden p-1 transition-all duration-200
+                                ${isSending && selectedOption !== idx ? 'opacity-50 grayscale' : 'active:scale-95'}
                                 bg-slate-800
+                                md:rounded-2xl md:hover:scale-[1.02]
                             `}
                         >
-                            <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex items-center gap-3 md:gap-4 relative z-10 text-left">
-                                <div className={`hidden md:flex w-10 h-10 rounded-full flex-shrink-0 items-center justify-center text-lg font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
+                            <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full p-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left md:rounded-xl">
+                                <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex-shrink-0 flex items-center justify-center text-sm md:text-lg font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
                                     {letters[idx]}
                                 </div>
-                                <span className="text-base md:text-lg font-bold text-white leading-tight w-full">{opt}</span>
+                                <span className="text-sm md:text-lg font-bold text-white leading-tight w-full">{opt}</span>
                             </div>
                             {/* Border gradient background */}
                             <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />

@@ -177,8 +177,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     };
 
     const handleKickPlayer = async (playerId) => {
-        if (!confirm('Är du säker på att du vill ta bort denna spelare?')) return;
-
+        // Direkt borttagning utan konfirmation
         await supabase.from('players').delete().eq('id', playerId);
         // Realtime lyssnaren kommer uppdatera listan
     };
