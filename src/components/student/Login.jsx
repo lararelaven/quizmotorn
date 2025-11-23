@@ -1,5 +1,3 @@
-// src/components/student/Login.jsx
-
 'use client';
 import React, { useState } from 'react';
 import { Shuffle, Loader2, AlertCircle } from 'lucide-react';
@@ -130,7 +128,7 @@ export default function StudentLogin({ dispatch }) {
                             placeholder="Namn..."
                             value={name}
                             onChange={e => setName(e.target.value)}
-                            className="flex-1 p-4 bg-slate-100 rounded-xl border-2 border-slate-200 focus:border-pink-500 focus:outline-none font-bold text-lg placeholder-slate-400"
+                            className="flex-1 p-4 bg-slate-100 rounded-xl border-2 border-slate-200 focus:border-pink-500 focus:outline-none font-bold text-lg placeholder-slate-400 text-slate-900"
                             disabled={loading}
                         />
                         <button

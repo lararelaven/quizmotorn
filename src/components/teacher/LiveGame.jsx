@@ -323,7 +323,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     const isPreview = session.settings?.question_state === 'preview';
 
     // Dynamic font size for long questions
-    const questionTextSize = question.question.length > 60 ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl';
+    const questionTextSize = question.question.length > 60 ? 'text-[24px]' : 'text-[30px]';
 
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
@@ -382,7 +382,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                                 </div>
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleKickPlayer(p.id); }}
-                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
                                                     title="Ta bort spelare"
                                                 >
                                                     <X className="w-4 h-4" />

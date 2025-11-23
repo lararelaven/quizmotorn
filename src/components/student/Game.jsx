@@ -33,12 +33,14 @@ export default function StudentGame({ session, player, dispatch }) {
     const [selectedOption, setSelectedOption] = useState(null);
     const [isSending, setIsSending] = useState(false);
     const [timeLeft, setTimeLeft] = useState(session.settings.timerEnabled ? session.settings.timerDuration : null);
+    const [earnedPoints, setEarnedPoints] = useState(0);
 
     // Reset state on new question
     useEffect(() => {
         setHasAnswered(false);
         setSelectedOption(null);
         setIsSending(false);
+        setEarnedPoints(0);
         if (session.settings.timerEnabled) {
             setTimeLeft(session.settings.timerDuration);
         }
@@ -141,6 +143,7 @@ export default function StudentGame({ session, player, dispatch }) {
             if (error) throw error;
 
             setHasAnswered(true);
+            setEarnedPoints(points);
             dispatch({ type: 'UPDATE_PLAYER_SCORE', payload: newScore });
         } catch (error) {
             console.error('Error submitting answer:', error);
@@ -163,7 +166,7 @@ export default function StudentGame({ session, player, dispatch }) {
                     <div>
                         <h1 className="text-4xl font-black mb-2">{isCorrect ? 'Rätt svar!' : 'Tyvärr, fel svar.'}</h1>
                         <p className="text-slate-400 text-xl">
-                            {isCorrect ? `+${(player.score - (player.prevScore || player.score))} poäng` : 'Inga poäng denna gång'}
+                            {isCorrect ? `+${earnedPoints} poäng` : 'Inga poäng denna gång'}
                         </p>
                     </div>
 
