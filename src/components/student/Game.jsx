@@ -282,7 +282,7 @@ export default function StudentGame({ session, player, dispatch }) {
             <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full pb-[50vh] md:pb-0">
                 <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
 
-                {/* Options Grid - Mobile Optimized */}
+                {/* Options Grid - Mobile Optimized (Round 6) */}
                 <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent">
                     {question.options.map((opt, idx) => (
                         <button
@@ -292,18 +292,31 @@ export default function StudentGame({ session, player, dispatch }) {
                             className={`
                                 relative overflow-hidden p-1 transition-all duration-200
                                 ${isSending && selectedOption !== idx ? 'opacity-50 grayscale' : 'active:scale-95'}
-                                bg-slate-800
+                                md:bg-slate-800
                                 md:rounded-2xl md:hover:scale-[1.02]
                             `}
                         >
-                            <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full p-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left md:rounded-xl">
-                                <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex-shrink-0 flex items-center justify-center text-sm md:text-lg font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
+                            {/* Mobile: Full background color. Desktop: Dark background with gradient icon */}
+                            <div className={`
+                                h-full w-full p-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left md:rounded-xl
+                                bg-gradient-to-br ${gradients[idx % 4]} md:bg-none md:bg-slate-900/90 md:backdrop-blur-sm
+                            `}>
+                                {/* Letter: Absolute Top-Left on Mobile, Icon on Desktop */}
+                                <div className={`
+                                    absolute top-2 left-3 text-white/80 font-black text-xl
+                                    md:static md:w-10 md:h-10 md:rounded-full md:flex-shrink-0 md:flex md:items-center md:justify-center md:text-lg md:text-white md:shadow-lg md:bg-gradient-to-br md:${gradients[idx % 4]}
+                                `}>
                                     {letters[idx]}
                                 </div>
-                                <span className="text-sm md:text-lg font-bold text-white leading-tight w-full">{opt}</span>
+
+                                {/* Option Text: Larger on Mobile */}
+                                <span className="text-xl md:text-lg font-bold text-white leading-tight w-full drop-shadow-md md:drop-shadow-none mt-4 md:mt-0">
+                                    {opt}
+                                </span>
                             </div>
-                            {/* Border gradient background */}
-                            <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+
+                            {/* Desktop only: Border gradient background */}
+                            <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
                         </button>
                     ))}
                 </div>

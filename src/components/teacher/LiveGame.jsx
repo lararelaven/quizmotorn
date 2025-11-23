@@ -333,6 +333,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
     // Dynamic font size for long questions
     const questionTextSize = question.question.length > 60 ? 'text-[24px]' : 'text-[30px]';
 
+    // Check if this is the last question
+    const isLastQuestion = session.currentQuestionIndex >= session.quizData.questions.length - 1;
+
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
 
@@ -531,9 +534,19 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 ) : (
                     <button
                         onClick={handleNextQuestion}
-                        className="bg-indigo-600 text-white px-8 py-4 rounded-full font-black text-xl hover:bg-indigo-500 hover:scale-105 transition-all shadow-2xl shadow-indigo-500/30 flex items-center gap-2"
+                        className={`
+                            px-8 py-4 rounded-full font-black text-xl hover:scale-105 transition-all shadow-2xl flex items-center gap-2
+                            ${isLastQuestion
+                                ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-yellow-500/30'
+                                : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/30'
+                            }
+                        `}
                     >
-                        Nästa Fråga <ArrowRight className="w-6 h-6" />
+                        {isLastQuestion ? (
+                            <>Resultat <Trophy className="w-6 h-6" /></>
+                        ) : (
+                            <>Nästa Fråga <ArrowRight className="w-6 h-6" /></>
+                        )}
                     </button>
                 )}
             </div>
