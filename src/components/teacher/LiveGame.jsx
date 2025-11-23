@@ -5,6 +5,15 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
+// Constants for styling (matching Student View)
+const letters = ['A', 'B', 'C', 'D'];
+const gradients = [
+    'from-pink-500 to-rose-500',
+    'from-blue-500 to-cyan-500',
+    'from-amber-500 to-orange-500',
+    'from-purple-500 to-indigo-500'
+];
+
 export default function TeacherLiveGame({ session, dispatch }) {
     const question = session.quizData.questions[session.currentQuestionIndex];
     const isFinished = session.status === 'finished' || session.currentQuestionIndex >= session.quizData.questions.length;
@@ -327,33 +336,45 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
-            {/* Header */}
-            <div className="bg-slate-800/50 p-4 flex justify-between items-center border-b border-white/5 backdrop-blur-sm z-10 relative">
+
+            {/* Timer Bar (Top Center) - Only if enabled - NOW OVER EVERYTHING */}
+            {session.settings.timerEnabled && (
+                <div className="absolute top-0 left-0 w-full h-2 bg-slate-800 z-50">
+                    <div
+                        className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
+                                (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
+                            }`}
+                        style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
+                    />
+                </div>
+            )}
+
+            {/* Header - Transparent & No Border */}
+            <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-40 pointer-events-none mt-4">
                 {/* Left: Question Counter */}
-                <div className="bg-indigo-600 px-4 py-2 rounded-lg font-bold text-white shadow-lg">
-                    {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
+                <div className="bg-black/20 backdrop-blur-md px-4 py-2 rounded-lg font-mono font-bold text-white/80 border border-white/10 pointer-events-auto">
+                    FRÅGA {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
                 </div>
 
-                {/* Center: Timer (Only if enabled) */}
-                {session.settings.timerEnabled && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-1/3 max-w-md">
-                        <div className="h-3 bg-slate-800 rounded-full overflow-hidden relative shadow-inner">
-                            <div
-                                className={`h-full shadow-[0_0_15px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
-                                        (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
-                                    }`}
-                                style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
-                            />
+                {/* Center: Leaderboard (Top 3) */}
+                <div className="flex gap-2 pointer-events-auto">
+                    {topPlayers.slice(0, 3).map((p, i) => (
+                        <div key={p.id} className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 animate-in fade-in slide-in-from-top-4 duration-500" style={{ animationDelay: `${i * 100}ms` }}>
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-slate-400 text-black' : 'bg-amber-700 text-white'}`}>
+                                {i + 1}
+                            </div>
+                            <span className="text-xs font-bold text-white max-w-[80px] truncate">{p.name}</span>
+                            <span className="text-xs font-mono text-indigo-300">{p.score}</span>
                         </div>
-                    </div>
-                )}
+                    ))}
+                </div>
 
                 {/* Right: Answer Count & Controls */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 pointer-events-auto">
                     <div className="relative">
                         <button
                             onClick={() => setShowPlayerList(!showPlayerList)}
-                            className="flex items-center gap-2 bg-slate-950/50 px-4 py-2 rounded-lg border border-white/5 hover:bg-slate-900 transition-colors"
+                            className="flex items-center gap-2 bg-slate-950/50 px-4 py-2 rounded-lg border border-white/5 hover:bg-slate-900 transition-colors backdrop-blur-md"
                         >
                             <Users className="w-5 h-5 text-indigo-400" />
                             <span className="font-bold text-white">{answersCount}</span>
@@ -363,7 +384,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
                         {/* Player Dropdown */}
                         {showPlayerList && (
-                            <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto">
                                 <div className="p-3 border-b border-white/5 bg-slate-900/50">
                                     <h3 className="text-sm font-bold text-slate-300">Deltagare</h3>
                                 </div>
@@ -381,8 +402,12 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                                     <span className="text-sm font-medium text-white">{p.name}</span>
                                                 </div>
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); handleKickPlayer(p.id); }}
-                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleKickPlayer(p.id);
+                                                    }}
+                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
                                                     title="Ta bort spelare"
                                                 >
                                                     <X className="w-4 h-4" />
@@ -400,7 +425,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
                     <button
                         onClick={() => setShowExitConfirm(true)}
-                        className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors"
+                        className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors backdrop-blur-md bg-slate-950/30"
                     >
                         <StopCircle className="w-6 h-6" />
                     </button>
@@ -408,7 +433,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 overflow-y-auto" ref={scrollRef}>
+            <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 overflow-y-auto mt-16" ref={scrollRef}>
 
                 {/* Question Card */}
                 <div className="w-full max-w-4xl mb-8 animate-slide-up">
@@ -429,27 +454,43 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     </h2>
                 </div>
 
-                {/* Options Grid - HIDDEN DURING PREVIEW */}
+                {/* Options Grid - Styled like Student View */}
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl transition-opacity duration-500 ${isPreview ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {question.options.map((opt, idx) => {
                         const isCorrect = idx === question.correctAnswerIndex;
                         const showResult = showAnswer;
 
-                        let bgClass = "bg-slate-800";
+                        // Base styling
+                        let containerClass = "bg-slate-800";
+                        let opacityClass = "opacity-100";
+
                         if (showResult) {
-                            bgClass = isCorrect ? "bg-green-600 ring-4 ring-green-400/50 scale-[1.02] z-10" : "bg-slate-800 opacity-50 grayscale";
+                            if (isCorrect) {
+                                containerClass = "bg-green-600 ring-4 ring-green-400/50 scale-[1.02] z-10";
+                            } else {
+                                opacityClass = "opacity-50 grayscale";
+                            }
                         }
 
                         return (
                             <div
                                 key={idx}
-                                className={`${bgClass} p-6 rounded-2xl border-2 border-slate-700 flex items-center gap-4 transition-all duration-500 shadow-xl relative overflow-hidden group`}
+                                className={`
+                                    relative overflow-hidden rounded-2xl p-1 transition-all duration-200
+                                    ${containerClass} ${opacityClass}
+                                    ${!showResult ? 'hover:scale-[1.02]' : ''}
+                                    shadow-xl group
+                                `}
                             >
-                                <div className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-xl font-black text-white shadow-lg bg-gradient-to-br ${['from-pink-500 to-rose-500', 'from-blue-500 to-cyan-500', 'from-amber-500 to-orange-500', 'from-purple-500 to-indigo-500'][idx % 4]}`}>
-                                    {['A', 'B', 'C', 'D'][idx]}
+                                <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex items-center gap-3 md:gap-4 relative z-10 text-left">
+                                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex-shrink-0 flex items-center justify-center text-lg md:text-xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
+                                        {letters[idx]}
+                                    </div>
+                                    <span className="text-xl md:text-2xl font-bold text-white leading-tight w-full">{opt}</span>
+                                    {showResult && isCorrect && <CheckCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 text-white animate-bounce" />}
                                 </div>
-                                <span className="text-xl md:text-2xl font-bold text-white">{opt}</span>
-                                {showResult && isCorrect && <CheckCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 text-white animate-bounce" />}
+                                {/* Border gradient background */}
+                                <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
                             </div>
                         );
                     })}
