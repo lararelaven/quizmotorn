@@ -55,14 +55,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     } else if (payload.eventType === 'UPDATE') {
                         setConnectedPlayers(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
 
-                        // Uppdatera antal svar
-                        if (payload.new.answers && payload.new.answers[session.currentQuestionIndex] !== undefined) {
-                            // Vi räknar om totalen baserat på listan för att vara säkra
-                            // Men för snabb respons kan vi kolla diffen. 
-                            // Enklast är att uppdatera connectedPlayers och sen räkna derived state, men vi har answersCount state.
-                            // Vi gör en fetchPlayers-liknande logik eller bara litar på att vi uppdaterar listan.
-                        }
-
                         // Uppdatera leaderboard om poäng ändras
                         if (payload.new.score !== payload.old.score) {
                             fetchTopPlayers();
@@ -196,8 +188,10 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     // Timer logic
     useEffect(() => {
-        if (session.settings?.question_state !== 'answering' || !session.settings.timerEnabled) {
-            setTimeLeft(session.settings.timerDuration);
+        // Stoppa timer om vi visar svaret eller om frågan inte är i 'answering' fas
+        if (showAnswer || session.settings?.question_state !== 'answering' || !session.settings.timerEnabled) {
+            // Om vi precis visade svaret, behåll tiden där den är (frys den)
+            // Om vi byter fråga (showAnswer blir false), återställs den av nästa effekt
             return;
         }
 
@@ -213,15 +207,14 @@ export default function TeacherLiveGame({ session, dispatch }) {
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [timeLeft, session.settings?.question_state, session.settings.timerEnabled]);
+    }, [timeLeft, session.settings?.question_state, session.settings.timerEnabled, showAnswer]);
 
     // Reset timer when question changes (fallback)
     useEffect(() => {
-        if (session.settings.timerEnabled) {
+        if (session.settings.timerEnabled && !showAnswer) {
             setTimeLeft(session.settings.timerDuration);
         }
-        setShowAnswer(false);
-    }, [session.currentQuestionIndex, session.settings.timerEnabled, session.settings.timerDuration]);
+    }, [session.currentQuestionIndex, session.settings.timerEnabled, session.settings.timerDuration, showAnswer]);
 
     useEffect(() => {
         if (showAnswer && scrollRef.current) {
@@ -329,6 +322,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     const isPreview = session.settings?.question_state === 'preview';
 
+    // Dynamic font size for long questions
+    const questionTextSize = question.question.length > 60 ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl';
+
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
             {/* Header */}
@@ -343,7 +339,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-1/3 max-w-md">
                         <div className="h-3 bg-slate-800 rounded-full overflow-hidden relative shadow-inner">
                             <div
-                                className={`h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-[0_0_15px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' ? 'transition-all duration-1000 ease-linear' : 'transition-none'}`}
+                                className={`h-full shadow-[0_0_15px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
+                                        (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
+                                    }`}
                                 style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
                             />
                         </div>
@@ -387,7 +385,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                                     className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
                                                     title="Ta bort spelare"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <X className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         );
@@ -426,7 +424,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                             </div>
                         </div>
                     )}
-                    <h2 className="text-3xl md:text-5xl font-black text-white text-center leading-tight drop-shadow-xl">
+                    <h2 className={`${questionTextSize} font-bold text-white text-center leading-tight drop-shadow-xl`}>
                         {question.question}
                     </h2>
                 </div>
@@ -445,7 +443,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                         return (
                             <div
                                 key={idx}
-                                className={`${bgClass} p-6 rounded-2xl border border-white/10 flex items-center gap-4 transition-all duration-500 shadow-xl relative overflow-hidden group`}
+                                className={`${bgClass} p-6 rounded-2xl border-2 border-slate-700 flex items-center gap-4 transition-all duration-500 shadow-xl relative overflow-hidden group`}
                             >
                                 <div className={`w-12 h-12 rounded-full flex-shrink-0 flex items-center justify-center text-xl font-black text-white shadow-lg bg-gradient-to-br ${['from-pink-500 to-rose-500', 'from-blue-500 to-cyan-500', 'from-amber-500 to-orange-500', 'from-purple-500 to-indigo-500'][idx % 4]}`}>
                                     {['A', 'B', 'C', 'D'][idx]}

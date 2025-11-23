@@ -32,13 +32,33 @@ export default function StudentGame({ session, player, dispatch }) {
     const [hasAnswered, setHasAnswered] = useState(false);
     const [selectedOption, setSelectedOption] = useState(null);
     const [isSending, setIsSending] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(session.settings.timerEnabled ? session.settings.timerDuration : null);
 
     // Reset state on new question
     useEffect(() => {
         setHasAnswered(false);
         setSelectedOption(null);
         setIsSending(false);
-    }, [questionIndex]);
+        if (session.settings.timerEnabled) {
+            setTimeLeft(session.settings.timerDuration);
+        }
+    }, [questionIndex, session.settings.timerEnabled, session.settings.timerDuration]);
+
+    // Timer logic (Sync with teacher's timer roughly)
+    useEffect(() => {
+        if (showAnswer || session.settings?.question_state !== 'answering' || !session.settings.timerEnabled) {
+            return;
+        }
+
+        if (timeLeft === null) return;
+        if (timeLeft === 0) return;
+
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [timeLeft, session.settings?.question_state, session.settings.timerEnabled, showAnswer]);
 
     // Realtime subscription
     useEffect(() => {
@@ -64,6 +84,7 @@ export default function StudentGame({ session, player, dispatch }) {
     }, [session.id, dispatch]);
 
     // --- PREVIEW VIEW (Get Ready) ---
+    // Ensure we check for 'preview' state specifically
     if (session.settings?.question_state === 'preview') {
         return (
             <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
@@ -219,8 +240,20 @@ export default function StudentGame({ session, player, dispatch }) {
 
     // --- QUESTION VIEW (Answering) ---
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col p-4">
-            <div className="flex justify-between items-center mb-6 text-slate-400 font-bold font-mono text-sm">
+        <div className="min-h-screen bg-slate-900 flex flex-col p-4 relative overflow-hidden">
+            {/* Timer Bar (Top Center) - Only if enabled */}
+            {session.settings.timerEnabled && (
+                <div className="absolute top-0 left-0 w-full h-2 bg-slate-800 z-50">
+                    <div
+                        className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
+                                (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
+                            }`}
+                        style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
+                    />
+                </div>
+            )}
+
+            <div className="flex justify-between items-center mb-6 text-slate-400 font-bold font-mono text-sm mt-4">
                 <span>FRÅGA {questionIndex + 1}</span>
                 <div className="flex flex-col items-end">
                     <span className="text-white">{player.name}</span>
