@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import {
-    UserCheck, StopCircle, Monitor, Play, ArrowRight, Trophy, Maximize2, X, CheckCircle, Loader2
+    UserCheck, StopCircle, Monitor, Play, ArrowRight, Trophy, Maximize2, X, CheckCircle, Loader2, Users, Trash2, ChevronDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -13,34 +13,60 @@ export default function TeacherLiveGame({ session, dispatch }) {
     const [timeLeft, setTimeLeft] = useState(session.settings.timerEnabled ? session.settings.timerDuration : null);
     const [showExitConfirm, setShowExitConfirm] = useState(false);
     const [zoomImage, setZoomImage] = useState(null);
+    const [showPlayerList, setShowPlayerList] = useState(false);
 
     // Nytt state för att räkna svar i realtid
     const [answersCount, setAnswersCount] = useState(0);
     const [topPlayers, setTopPlayers] = useState([]);
-    const totalPlayers = session.players?.length || 0;
+    const [connectedPlayers, setConnectedPlayers] = useState([]);
+    const totalPlayers = connectedPlayers.length;
 
     const scrollRef = useRef(null);
 
-    // --- NYTT: Lyssna på inkommande svar OCH poänguppdateringar (för leaderboard) ---
+    // --- Lyssna på inkommande svar OCH poänguppdateringar (för leaderboard) ---
     useEffect(() => {
         if (!session.id) return;
 
         // Nollställ räknaren vid ny fråga
         setAnswersCount(0);
 
+        // Hämta spelare initialt
+        const fetchPlayers = async () => {
+            const { data } = await supabase.from('players').select('*').eq('session_id', session.id);
+            if (data) {
+                setConnectedPlayers(data);
+                // Räkna hur många som redan svarat på denna fråga (om man laddar om sidan)
+                const answered = data.filter(p => p.answers && p.answers[session.currentQuestionIndex] !== undefined).length;
+                setAnswersCount(answered);
+            }
+        };
+        fetchPlayers();
+
         const channel = supabase
             .channel('game_answers_live')
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
+                { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
                 (payload) => {
-                    // Uppdatera antal svar
-                    if (payload.new.answers && payload.new.answers[session.currentQuestionIndex] !== undefined) {
-                        setAnswersCount(prev => prev + 1);
-                    }
-                    // Uppdatera leaderboard om poäng ändras
-                    if (payload.new.score !== payload.old.score) {
-                        fetchTopPlayers();
+                    if (payload.eventType === 'INSERT') {
+                        setConnectedPlayers(prev => [...prev, payload.new]);
+                    } else if (payload.eventType === 'DELETE') {
+                        setConnectedPlayers(prev => prev.filter(p => p.id !== payload.old.id));
+                    } else if (payload.eventType === 'UPDATE') {
+                        setConnectedPlayers(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
+
+                        // Uppdatera antal svar
+                        if (payload.new.answers && payload.new.answers[session.currentQuestionIndex] !== undefined) {
+                            // Vi räknar om totalen baserat på listan för att vara säkra
+                            // Men för snabb respons kan vi kolla diffen. 
+                            // Enklast är att uppdatera connectedPlayers och sen räkna derived state, men vi har answersCount state.
+                            // Vi gör en fetchPlayers-liknande logik eller bara litar på att vi uppdaterar listan.
+                        }
+
+                        // Uppdatera leaderboard om poäng ändras
+                        if (payload.new.score !== payload.old.score) {
+                            fetchTopPlayers();
+                        }
                     }
                 }
             )
@@ -53,6 +79,12 @@ export default function TeacherLiveGame({ session, dispatch }) {
         };
     }, [session.currentQuestionIndex, session.id]);
 
+    // Uppdatera answersCount baserat på connectedPlayers
+    useEffect(() => {
+        const count = connectedPlayers.filter(p => p.answers && p.answers[session.currentQuestionIndex] !== undefined).length;
+        setAnswersCount(count);
+    }, [connectedPlayers, session.currentQuestionIndex]);
+
     const fetchTopPlayers = async () => {
         const { data } = await supabase
             .from('players')
@@ -63,7 +95,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
         if (data) setTopPlayers(data);
     };
 
-    // --- NYTT: Hantera Preview-fasen automatiskt via useEffect ---
+    // --- Hantera Preview-fasen automatiskt via useEffect ---
     useEffect(() => {
         if (session.settings?.question_state === 'preview') {
             const timer = setTimeout(async () => {
@@ -134,32 +166,31 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     const handleShowAnswer = async () => {
         setShowAnswer(true);
-        // Visa svar för elever
+        // Visa svar för elever OCH sätt status till finished så de inte kan svara mer
         await supabase
             .from('sessions')
             .update({
-                settings: { ...session.settings, showAnswer: true }
+                settings: { ...session.settings, showAnswer: true, question_state: 'finished' } // question_state finished stoppar svar
             })
             .eq('id', session.id);
     };
 
+    const handleKickPlayer = async (playerId) => {
+        if (!confirm('Är du säker på att du vill ta bort denna spelare?')) return;
+
+        await supabase.from('players').delete().eq('id', playerId);
+        // Realtime lyssnaren kommer uppdatera listan
+    };
+
     const handleEndGame = async () => {
-        // Sätt status till 'finished' för att visa resultatsidan för alla
         await supabase.from('sessions').update({ status: 'finished' }).eq('id', session.id);
         dispatch({ type: 'END_GAME' });
     };
 
     const handleCloseSession = async () => {
-        // Stäng sessionen helt
         await supabase.from('sessions').update({ status: 'closed' }).eq('id', session.id);
-
-        // Rensa lokal lagring
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('teacher_session_id');
-        }
-
+        if (typeof window !== 'undefined') localStorage.removeItem('teacher_session_id');
         dispatch({ type: 'RESET_APP' });
-        // Tvinga navigering till dashboard
         window.location.href = '/';
     };
 
@@ -235,25 +266,18 @@ export default function TeacherLiveGame({ session, dispatch }) {
         }
     }, [isFinished]);
 
-    const getTimerColor = (current, total) => {
-        const percentage = (current / total) * 100;
-        if (percentage > 60) return 'bg-green-500';
-        if (percentage > 30) return 'bg-yellow-400';
-        return 'bg-red-500 animate-pulse';
-    };
-
     if (isFinished) {
-        const sortedPlayers = [...(topPlayers.length > 0 ? topPlayers : session.players || [])]
+        // ... (Resultatvy - behålls som den är för nu, fokus på spelvyn)
+        const sortedPlayers = [...(topPlayers.length > 0 ? topPlayers : connectedPlayers || [])]
             .sort((a, b) => b.score - a.score)
             .slice(0, 3);
 
         return (
             <div className="flex flex-col h-screen items-center justify-center bg-slate-900 text-white p-8 overflow-hidden relative">
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 animate-pulse"></div>
-
                 <Trophy className="w-32 h-32 text-yellow-400 mb-8 animate-bounce drop-shadow-[0_0_35px_rgba(250,204,21,0.6)]" />
                 <h1 className="text-7xl font-black mb-16 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 drop-shadow-sm">Resultat</h1>
-
+                {/* ... (Resten av resultatvyn) ... */}
                 <div className="flex items-end justify-center gap-4 md:gap-8 w-full max-w-4xl mb-12 perspective-1000">
                     {/* 2nd Place */}
                     {sortedPlayers[1] && (
@@ -267,7 +291,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
                             </div>
                         </div>
                     )}
-
                     {/* 1st Place */}
                     {sortedPlayers[0] && (
                         <div className="flex flex-col items-center z-10 animate-slide-up">
@@ -282,7 +305,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
                             </div>
                         </div>
                     )}
-
                     {/* 3rd Place */}
                     {sortedPlayers[2] && (
                         <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.4s' }}>
@@ -296,23 +318,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                         </div>
                     )}
                 </div>
-
-                <div className="w-full max-w-2xl space-y-2 mb-12 px-4">
-                    {sortedPlayers.slice(3).map((p, i) => (
-                        <div key={p.id || i} className="flex justify-between items-center bg-white/5 p-4 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
-                            <div className="flex items-center gap-4">
-                                <div className="w-8 h-8 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-sm">{i + 4}</div>
-                                <span className="text-xl font-medium text-slate-200">{p.name}</span>
-                            </div>
-                            <span className="text-xl font-mono text-slate-400">{p.score} p</span>
-                        </div>
-                    ))}
-                </div>
-
-                <button
-                    onClick={handleCloseSession}
-                    className="relative z-[100] px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all duration-300 flex items-center gap-2 cursor-pointer"
-                >
+                <button onClick={handleCloseSession} className="relative z-[100] px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all duration-300 flex items-center gap-2 cursor-pointer">
                     <StopCircle className="w-6 h-6" /> Avsluta Session
                 </button>
             </div>
@@ -326,20 +332,74 @@ export default function TeacherLiveGame({ session, dispatch }) {
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
             {/* Header */}
-            <div className="bg-slate-800/50 p-4 flex justify-between items-center border-b border-white/5 backdrop-blur-sm z-10">
-                <div className="flex items-center gap-4">
-                    <div className="bg-indigo-600 px-4 py-2 rounded-lg font-bold text-white shadow-lg">
-                        {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
-                    </div>
-                    <div className="text-slate-400 font-mono text-sm hidden md:block">PIN: {session.pin_code}</div>
+            <div className="bg-slate-800/50 p-4 flex justify-between items-center border-b border-white/5 backdrop-blur-sm z-10 relative">
+                {/* Left: Question Counter */}
+                <div className="bg-indigo-600 px-4 py-2 rounded-lg font-bold text-white shadow-lg">
+                    {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-slate-950/50 px-4 py-2 rounded-lg border border-white/5">
-                        <UserCheck className="w-5 h-5 text-green-400" />
-                        <span className="font-bold text-white">{answersCount}</span>
-                        <span className="text-slate-400 text-sm">svar</span>
+                {/* Center: Timer (Only if enabled) */}
+                {session.settings.timerEnabled && (
+                    <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-1/3 max-w-md">
+                        <div className="h-3 bg-slate-800 rounded-full overflow-hidden relative shadow-inner">
+                            <div
+                                className={`h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-[0_0_15px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' ? 'transition-all duration-1000 ease-linear' : 'transition-none'}`}
+                                style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
+                            />
+                        </div>
                     </div>
+                )}
+
+                {/* Right: Answer Count & Controls */}
+                <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowPlayerList(!showPlayerList)}
+                            className="flex items-center gap-2 bg-slate-950/50 px-4 py-2 rounded-lg border border-white/5 hover:bg-slate-900 transition-colors"
+                        >
+                            <Users className="w-5 h-5 text-indigo-400" />
+                            <span className="font-bold text-white">{answersCount}</span>
+                            <span className="text-slate-400 text-sm">/ {totalPlayers} svar</span>
+                            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showPlayerList ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {/* Player Dropdown */}
+                        {showPlayerList && (
+                            <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                <div className="p-3 border-b border-white/5 bg-slate-900/50">
+                                    <h3 className="text-sm font-bold text-slate-300">Deltagare</h3>
+                                </div>
+                                <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                                    {connectedPlayers.map(p => {
+                                        const hasAnswered = p.answers && p.answers[session.currentQuestionIndex] !== undefined;
+                                        return (
+                                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 group">
+                                                <div className="flex items-center gap-3">
+                                                    {hasAnswered ? (
+                                                        <CheckCircle className="w-4 h-4 text-green-400" />
+                                                    ) : (
+                                                        <div className="w-4 h-4 rounded-full border-2 border-slate-600" />
+                                                    )}
+                                                    <span className="text-sm font-medium text-white">{p.name}</span>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleKickPlayer(p.id); }}
+                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Ta bort spelare"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    {connectedPlayers.length === 0 && (
+                                        <div className="p-4 text-center text-slate-500 text-sm">Inga deltagare anslutna</div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <button
                         onClick={() => setShowExitConfirm(true)}
                         className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors"
@@ -350,7 +410,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 overflow-y-auto" ref={scrollRef}>
 
                 {/* Question Card */}
                 <div className="w-full max-w-4xl mb-8 animate-slide-up">
@@ -397,6 +457,18 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     })}
                 </div>
 
+                {/* Explanation Text (Only shown after answer) */}
+                {showAnswer && question.explanation && (
+                    <div className="w-full max-w-5xl mt-8 p-6 bg-indigo-900/30 border border-indigo-500/30 rounded-2xl animate-fade-in">
+                        <h3 className="text-indigo-300 font-bold mb-2 flex items-center gap-2">
+                            <Monitor className="w-5 h-5" /> Förklaring
+                        </h3>
+                        <p className="text-white text-lg leading-relaxed">
+                            {question.explanation}
+                        </p>
+                    </div>
+                )}
+
                 {/* Preview Indicator */}
                 {isPreview && (
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-32">
@@ -409,34 +481,23 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
             </div>
 
-            {/* Footer / Controls */}
-            <div className="bg-slate-900/80 backdrop-blur-md p-6 border-t border-white/5 z-20">
-                <div className="max-w-6xl mx-auto flex items-center justify-between gap-8">
-                    {/* Timer Bar */}
-                    <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden relative shadow-inner">
-                        <div
-                            className={`h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-[0_0_15px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' ? 'transition-all duration-1000 ease-linear' : 'transition-none'}`}
-                            style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
-                        />
-                    </div>
-
-                    {/* Action Button */}
-                    {!showAnswer ? (
-                        <button
-                            onClick={() => setShowAnswer(true)}
-                            className="bg-white text-slate-900 px-8 py-3 rounded-xl font-black text-lg hover:bg-indigo-50 hover:scale-105 transition-all shadow-lg flex items-center gap-2 min-w-[200px] justify-center"
-                        >
-                            <Monitor className="w-5 h-5" /> Visa Svar
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleNextQuestion}
-                            className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-black text-lg hover:bg-indigo-500 hover:scale-105 transition-all shadow-lg shadow-indigo-500/30 flex items-center gap-2 min-w-[200px] justify-center"
-                        >
-                            Nästa Fråga <ArrowRight className="w-5 h-5" />
-                        </button>
-                    )}
-                </div>
+            {/* Floating Action Button */}
+            <div className="fixed bottom-8 right-8 z-50">
+                {!showAnswer ? (
+                    <button
+                        onClick={handleShowAnswer}
+                        className="bg-white text-slate-900 px-8 py-4 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all shadow-2xl flex items-center gap-2 shadow-indigo-500/20"
+                    >
+                        <Monitor className="w-6 h-6" /> Visa Svar
+                    </button>
+                ) : (
+                    <button
+                        onClick={handleNextQuestion}
+                        className="bg-indigo-600 text-white px-8 py-4 rounded-full font-black text-xl hover:bg-indigo-500 hover:scale-105 transition-all shadow-2xl shadow-indigo-500/30 flex items-center gap-2"
+                    >
+                        Nästa Fråga <ArrowRight className="w-6 h-6" />
+                    </button>
+                )}
             </div>
 
             {/* Exit Confirm Modal */}
