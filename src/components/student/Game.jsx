@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Check, X, Frown } from 'lucide-react';
+import { Loader2, Check, X, Frown, Trophy } from 'lucide-react';
 
 const letters = ['A', 'B', 'C', 'D'];
 const gradients = [
@@ -21,6 +21,7 @@ export default function StudentGame({ session, player, dispatch }) {
     const [isSending, setIsSending] = useState(false);
     const [timeLeft, setTimeLeft] = useState(session.settings.timerEnabled ? session.settings.timerDuration : null);
     const [earnedPoints, setEarnedPoints] = useState(0);
+    const [confidence, setConfidence] = useState('low'); // 'low' (Gissar), 'medium' (Tror), 'high' (Vet)
 
     // Reset state on new question
     useEffect(() => {
@@ -28,6 +29,7 @@ export default function StudentGame({ session, player, dispatch }) {
         setSelectedOption(null);
         setIsSending(false);
         setEarnedPoints(0);
+        setConfidence('low'); // Reset confidence
         if (session.settings.timerEnabled) {
             setTimeLeft(session.settings.timerDuration);
         }
@@ -117,18 +119,30 @@ export default function StudentGame({ session, player, dispatch }) {
             let points = 0;
 
             if (isCorrect) {
+                // 1. Base Score (Speed or Simple)
                 if (session.settings.timerEnabled && session.settings.scoreMode === 'speed' && session.settings.question_start_time) {
                     const now = Date.now();
                     const startTime = session.settings.question_start_time;
                     const duration = (session.settings.timerDuration || 30) * 1000;
                     const elapsed = Math.max(0, now - startTime);
-
-                    // Linjär poängminskning: 1000 -> 100
                     const percentageLeft = Math.max(0, (duration - elapsed) / duration);
                     points = Math.round(100 + (900 * percentageLeft));
                 } else {
-                    // Om ingen timer eller "enkelt" läge -> Alltid 1000 poäng
                     points = 1000;
+                }
+
+                // 2. Hybris Bonus (Additive)
+                if (session.settings.gamificationMode === 'hybris') {
+                    if (confidence === 'medium') points += 200; // Tror
+                    else if (confidence === 'high') points += 300; // Vet
+                    else points += 100; // Gissar (Bonus even for guessing correctly)
+                }
+            } else {
+                // Wrong Answer Logic
+                if (session.settings.gamificationMode === 'hybris') {
+                    if (confidence === 'medium') points -= 100; // Tror penalty
+                    else if (confidence === 'high') points -= 300; // Vet penalty
+                    // Gissar has 0 penalty
                 }
             }
 
@@ -222,9 +236,6 @@ export default function StudentGame({ session, player, dispatch }) {
         );
     }
 
-    // --- WAITING VIEW REMOVED ---
-    // We now stay in the Question View but with updated styling for options
-
     // --- QUESTION VIEW (Answering) ---
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col p-4 relative overflow-hidden">
@@ -250,6 +261,30 @@ export default function StudentGame({ session, player, dispatch }) {
 
             <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full pb-[50vh] md:pb-0">
                 <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
+
+                {/* Hybris Controls */}
+                {session.settings.gamificationMode === 'hybris' && !hasAnswered && (
+                    <div className="flex justify-center gap-2 mb-6 animate-fade-in">
+                        <button
+                            onClick={() => setConfidence('low')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 ${confidence === 'low' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                        >
+                            Gissar (+100)
+                        </button>
+                        <button
+                            onClick={() => setConfidence('medium')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 ${confidence === 'medium' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                        >
+                            Tror (+200)
+                        </button>
+                        <button
+                            onClick={() => setConfidence('high')}
+                            className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 ${confidence === 'high' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}
+                        >
+                            Vet (+300)
+                        </button>
+                    </div>
+                )}
 
                 {/* Options Grid - Mobile Optimized (Round 6) */}
                 <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent">

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Plus, Bot, Copy, BookOpen, Edit2, Trash2, Smartphone, Grid,
-    Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight, AlertTriangle, Save, Loader2
+    Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight, AlertTriangle, Save, Loader2, Trophy
 } from 'lucide-react';
 import { AI_PROMPT_TEXT, DEFAULT_QUIZ_JSON } from '../../lib/constants';
 import { generateTeamNames, generatePin } from '../../lib/utils';
@@ -181,7 +181,7 @@ export default function TeacherDashboard({ state, dispatch }) {
     };
 
     const openJeopardySetup = (quiz) => setJeopardyConfig({ quiz, teams: 3, teamNames: generateTeamNames(3) });
-    const openLiveSetup = (quiz) => setLiveConfig({ quiz, timerEnabled: false, timerDuration: 30, forceRandomNames: false, scoreMode: 'speed' });
+    const openLiveSetup = (quiz) => setLiveConfig({ quiz, timerEnabled: false, timerDuration: 30, forceRandomNames: false, scoreMode: 'speed', gamificationMode: 'none' });
 
     // --- JEOPARDY (OFFLINE / LOKALT) ---
     const startJeopardy = () => {
@@ -204,7 +204,14 @@ export default function TeacherDashboard({ state, dispatch }) {
     // --- LIVE QUIZ (ONLINE / DB) ---
     const startLive = async () => {
         if (!liveConfig) return;
-        const settings = { gameMode: 'live', timerEnabled: liveConfig.timerEnabled, timerDuration: liveConfig.timerDuration, forceRandomNames: liveConfig.forceRandomNames, scoreMode: liveConfig.scoreMode };
+        const settings = {
+            gameMode: 'live',
+            timerEnabled: liveConfig.timerEnabled,
+            timerDuration: liveConfig.timerDuration,
+            forceRandomNames: liveConfig.forceRandomNames,
+            scoreMode: liveConfig.scoreMode,
+            gamificationMode: liveConfig.gamificationMode
+        };
 
         // Skapa i DB
         const result = await createSessionInDb(liveConfig.quiz, 'live', settings);
@@ -467,6 +474,29 @@ export default function TeacherDashboard({ state, dispatch }) {
                                     </div>
                                 </div>
                             )}
+
+                            <div className="flex items-center justify-between p-5 bg-slate-800/50 rounded-2xl border border-white/10">
+                                <div>
+                                    <div className="font-bold text-white">Tävlingsform</div>
+                                    <div className="text-xs text-slate-400 mt-1">
+                                        {liveConfig.gamificationMode === 'hybris' ? 'Satsa poäng på ditt svar' : 'Standard quiz'}
+                                    </div>
+                                </div>
+                                <div className="flex bg-slate-950 rounded-xl p-1 border border-white/5">
+                                    <button
+                                        onClick={() => setLiveConfig(p => ({ ...p, gamificationMode: 'none' }))}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.gamificationMode === 'none' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                    >
+                                        Ingen
+                                    </button>
+                                    <button
+                                        onClick={() => setLiveConfig(p => ({ ...p, gamificationMode: 'hybris' }))}
+                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.gamificationMode === 'hybris' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                    >
+                                        <Trophy className="w-3 h-3" /> Hybris
+                                    </button>
+                                </div>
+                            </div>
 
                             <button onClick={startLive} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-xl hover:bg-slate-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer">Starta Quiz <ArrowRight className="w-5 h-5" /></button>
                         </div>
