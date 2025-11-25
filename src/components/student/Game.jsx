@@ -293,15 +293,41 @@ export default function StudentGame({ session, player, dispatch }) {
                         const isOther = hasAnswered && !isSelected;
 
                         // Base styling
-                        let containerClass = "bg-slate-800";
+                        let containerClass = "";
                         let opacityClass = "opacity-100";
+                        let contentClass = "";
+                        let letterClass = "hidden md:flex"; // Hide letter on mobile
+                        let textClass = "text-center md:text-left mt-0 md:mt-0"; // Center text on mobile
 
                         if (hasAnswered) {
                             if (isSelected) {
-                                containerClass = "bg-slate-800 ring-4 ring-white scale-[1.02] z-10";
+                                // Mobile: Full color + White Ring
+                                // Desktop: Dark BG + White Ring + Scale
+                                containerClass = `
+                                    bg-gradient-to-br ${gradients[idx % 4]} 
+                                    md:bg-slate-800 
+                                    ring-4 ring-white scale-[1.02] z-10
+                                `;
+                                contentClass = "bg-transparent md:bg-slate-900/90";
                             } else {
+                                // Mobile: Full color + Opacity
+                                // Desktop: Dark BG + Opacity
+                                containerClass = `
+                                    bg-gradient-to-br ${gradients[idx % 4]} 
+                                    md:bg-slate-800
+                                `;
+                                contentClass = "bg-transparent md:bg-slate-900/90";
                                 opacityClass = "opacity-50 grayscale scale-95";
                             }
+                        } else {
+                            // Default State
+                            // Mobile: Full color
+                            // Desktop: Dark BG
+                            containerClass = `
+                                bg-gradient-to-br ${gradients[idx % 4]} 
+                                md:bg-slate-800
+                            `;
+                            contentClass = "bg-transparent md:bg-slate-900/90";
                         }
 
                         return (
@@ -316,18 +342,19 @@ export default function StudentGame({ session, player, dispatch }) {
                                     shadow-xl group
                                 `}
                             >
-                                <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left">
+                                <div className={`${contentClass} backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10`}>
                                     <div className={`
-                                        w-10 h-10 md:w-12 md:h-12 rounded-full flex-shrink-0 flex items-center justify-center text-lg md:text-xl font-black text-white shadow-lg 
+                                        ${letterClass}
+                                        w-10 h-10 md:w-12 md:h-12 rounded-full flex-shrink-0 items-center justify-center text-lg md:text-xl font-black text-white shadow-lg 
                                         bg-gradient-to-br ${gradients[idx % 4]}
                                         absolute top-2 left-3 md:static
                                     `}>
                                         {letters[idx]}
                                     </div>
-                                    <span className="text-xl md:text-2xl font-bold text-white leading-tight w-full mt-8 md:mt-0">{opt}</span>
+                                    <span className={`text-xl md:text-2xl font-bold text-white leading-tight w-full ${textClass}`}>{opt}</span>
                                 </div>
-                                {/* Border gradient background */}
-                                <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+                                {/* Border gradient background (Desktop only) */}
+                                <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
                             </button>
                         );
                     })}
