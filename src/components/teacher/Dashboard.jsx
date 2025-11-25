@@ -104,6 +104,12 @@ export default function TeacherDashboard({ state, dispatch }) {
         if (!quizToDelete) return;
         const { id, index } = quizToDelete;
         if (id) {
+            // Först ta bort alla sessioner kopplade till detta quiz
+            const { error: sessionError } = await supabase.from('sessions').delete().eq('quiz_id', id);
+            if (sessionError) {
+                console.error("Kunde inte ta bort sessioner:", sessionError);
+            }
+
             const { error } = await supabase.from('quizzes').delete().eq('id', id);
             if (error) {
                 setError("Kunde inte ta bort: " + error.message);

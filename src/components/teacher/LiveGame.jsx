@@ -344,7 +344,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 <div className="absolute top-0 left-0 w-full h-2 bg-slate-800 z-50">
                     <div
                         className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
-                                (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
+                            (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
                             }`}
                         style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
                     />
@@ -404,12 +404,12 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                                     <span className="text-sm font-medium text-white">{p.name}</span>
                                                 </div>
                                                 <button
-                                                    onClick={(e) => {
+                                                    onMouseDown={(e) => {
                                                         e.preventDefault();
                                                         e.stopPropagation();
                                                         handleKickPlayer(p.id);
                                                     }}
-                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer"
+                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer z-50"
                                                     title="Ta bort spelare"
                                                 >
                                                     <X className="w-4 h-4" />
@@ -558,8 +558,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
                         <h3 className="text-2xl font-bold text-white mb-2">Avsluta sessionen?</h3>
                         <p className="text-slate-400 mb-8">Alla deltagare kommer att kopplas bort.</p>
                         <div className="flex gap-4">
+                            <button onClick={handleEndGame} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-all">Resultat</button>
+                            <button onClick={handleCloseSession} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all">Stäng</button>
                             <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors">Avbryt</button>
-                            <button onClick={handleCloseSession} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all">Avsluta</button>
                         </div>
                     </div>
                 </div>
