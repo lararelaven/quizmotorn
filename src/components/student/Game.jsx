@@ -21,7 +21,7 @@ export default function StudentGame({ session, player, dispatch }) {
     const [isSending, setIsSending] = useState(false);
     const [timeLeft, setTimeLeft] = useState(session.settings.timerEnabled ? session.settings.timerDuration : null);
     const [earnedPoints, setEarnedPoints] = useState(0);
-    const [confidence, setConfidence] = useState('low'); // 'low' (Gissar), 'medium' (Tror), 'high' (Vet)
+    const [confidence, setConfidence] = useState('medium'); // Default to 'medium' (Tror)
 
     // Reset state on new question
     useEffect(() => {
@@ -29,7 +29,7 @@ export default function StudentGame({ session, player, dispatch }) {
         setSelectedOption(null);
         setIsSending(false);
         setEarnedPoints(0);
-        setConfidence('low'); // Reset confidence
+        setConfidence('medium'); // Reset confidence to default
         if (session.settings.timerEnabled) {
             setTimeLeft(session.settings.timerDuration);
         }
@@ -89,22 +89,6 @@ export default function StudentGame({ session, player, dispatch }) {
         };
     }, [session.id, dispatch, player.id]);
 
-    // --- PREVIEW VIEW (Get Ready) ---
-    // Ensure we check for 'preview' state specifically
-    if (session.settings?.question_state === 'preview') {
-        return (
-            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
-                <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl bg-indigo-600 animate-pulse">
-                    <Loader2 className="w-12 h-12 text-white animate-spin" />
-                </div>
-                <div>
-                    <h1 className="text-4xl font-black mb-4">Gör dig redo!</h1>
-                    <p className="text-slate-400 text-xl max-w-2xl mx-auto">{question.question}</p>
-                </div>
-            </div>
-        );
-    }
-
     const handleAnswer = async (optionIndex) => {
         if (hasAnswered || isSending) return;
 
@@ -133,16 +117,16 @@ export default function StudentGame({ session, player, dispatch }) {
 
                 // 2. Hybris Bonus (Additive)
                 if (session.settings.gamificationMode === 'hybris') {
-                    if (confidence === 'medium') points += 200; // Tror
-                    else if (confidence === 'high') points += 300; // Vet
-                    else points += 100; // Gissar (Bonus even for guessing correctly)
+                    if (confidence === 'high') points += 500; // Vet
+                    else if (confidence === 'medium') points += 200; // Tror
+                    else points += 0; // Gissar (No bonus)
                 }
             } else {
                 // Wrong Answer Logic
                 if (session.settings.gamificationMode === 'hybris') {
-                    if (confidence === 'medium') points -= 100; // Tror penalty
-                    else if (confidence === 'high') points -= 300; // Vet penalty
-                    // Gissar has 0 penalty
+                    if (confidence === 'high') points -= 500; // Vet penalty
+                    else if (confidence === 'medium') points -= 200; // Tror penalty
+                    else points -= 0; // Gissar (No penalty)
                 }
             }
 
@@ -236,7 +220,9 @@ export default function StudentGame({ session, player, dispatch }) {
         );
     }
 
-    // --- QUESTION VIEW (Answering) ---
+    // --- MAIN GAME VIEW (Preview + Answering) ---
+    const isPreview = session.settings?.question_state === 'preview';
+
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col p-4 relative overflow-hidden">
             {/* Timer Bar (Top Center) - Only if enabled */}
@@ -262,103 +248,116 @@ export default function StudentGame({ session, player, dispatch }) {
             <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full pb-[50vh] md:pb-0">
                 <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
 
-                {/* Hybris Controls */}
+                {/* Hybris Controls - Visible in Preview AND Answering (if not answered) */}
                 {session.settings.gamificationMode === 'hybris' && !hasAnswered && (
-                    <div className="flex justify-center gap-2 mb-6 animate-fade-in">
+                    <div className="flex justify-center gap-2 mb-6 animate-fade-in relative z-50">
                         <button
                             onClick={() => setConfidence('low')}
                             className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 ${confidence === 'low' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}
                         >
-                            Gissar (+100)
+                            Gissar (0)
                         </button>
                         <button
                             onClick={() => setConfidence('medium')}
                             className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 ${confidence === 'medium' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}
                         >
-                            Tror (+200)
+                            Tror (+/- 200)
                         </button>
                         <button
                             onClick={() => setConfidence('high')}
                             className={`px-4 py-2 rounded-lg font-bold text-sm transition-all border-2 ${confidence === 'high' ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}
                         >
-                            Vet (+300)
+                            Vet (+/- 500)
                         </button>
                     </div>
                 )}
 
-                {/* Options Grid - Styled like Teacher View (Desktop Match) */}
-                <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent">
-                    {question.options.map((opt, idx) => {
-                        const isSelected = selectedOption === idx;
-                        const isOther = hasAnswered && !isSelected;
+                {/* Preview Loading State */}
+                {isPreview && (
+                    <div className="flex flex-col items-center justify-center py-12 animate-fade-in">
+                        <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-2xl bg-indigo-600 animate-pulse mb-6">
+                            <Loader2 className="w-10 h-10 text-white animate-spin" />
+                        </div>
+                        <h3 className="text-2xl font-black text-white mb-2">Gör dig redo!</h3>
+                        <p className="text-slate-400">Svarsalternativen kommer snart...</p>
+                    </div>
+                )}
 
-                        // Base styling
-                        let containerClass = "";
-                        let opacityClass = "opacity-100";
-                        let contentClass = "";
-                        let letterClass = "hidden md:flex"; // Hide letter on mobile
-                        let textClass = "text-center md:text-left mt-0 md:mt-0"; // Center text on mobile
+                {/* Options Grid - Hidden during preview */}
+                {!isPreview && (
+                    <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent animate-slide-up">
+                        {question.options.map((opt, idx) => {
+                            const isSelected = selectedOption === idx;
+                            const isOther = hasAnswered && !isSelected;
 
-                        if (hasAnswered) {
-                            if (isSelected) {
-                                // Mobile: Full color + White Ring
-                                // Desktop: Dark BG + White Ring + Scale
-                                containerClass = `
+                            // Base styling
+                            let containerClass = "";
+                            let opacityClass = "opacity-100";
+                            let contentClass = "";
+                            let letterClass = "hidden md:flex"; // Hide letter on mobile
+                            let textClass = "text-center md:text-left mt-0 md:mt-0"; // Center text on mobile
+
+                            if (hasAnswered) {
+                                if (isSelected) {
+                                    // Mobile: Full color + White Ring
+                                    // Desktop: Dark BG + White Ring + Scale
+                                    containerClass = `
                                     bg-gradient-to-br ${gradients[idx % 4]} 
                                     md:bg-slate-800 
                                     ring-4 ring-white scale-[1.02] z-10
                                 `;
-                                contentClass = "bg-transparent md:bg-slate-900/90";
-                            } else {
-                                // Mobile: Full color + Opacity
-                                // Desktop: Dark BG + Opacity
-                                containerClass = `
+                                    contentClass = "bg-transparent md:bg-slate-900/90";
+                                } else {
+                                    // Mobile: Full color + Opacity
+                                    // Desktop: Dark BG + Opacity
+                                    containerClass = `
                                     bg-gradient-to-br ${gradients[idx % 4]} 
                                     md:bg-slate-800
                                 `;
-                                contentClass = "bg-transparent md:bg-slate-900/90";
-                                opacityClass = "opacity-50 grayscale scale-95";
-                            }
-                        } else {
-                            // Default State
-                            // Mobile: Full color
-                            // Desktop: Dark BG
-                            containerClass = `
+                                    contentClass = "bg-transparent md:bg-slate-900/90";
+                                    opacityClass = "opacity-50 grayscale scale-95";
+                                }
+                            } else {
+                                // Default State
+                                // Mobile: Full color
+                                // Desktop: Dark BG
+                                containerClass = `
                                 bg-gradient-to-br ${gradients[idx % 4]} 
                                 md:bg-slate-800
                             `;
-                            contentClass = "bg-transparent md:bg-slate-900/90";
-                        }
+                                contentClass = "bg-transparent md:bg-slate-900/90";
+                            }
 
-                        return (
-                            <button
-                                key={idx}
-                                onClick={() => handleAnswer(idx)}
-                                disabled={isSending || hasAnswered}
-                                className={`
+                            return (
+                                <button
+                                    key={idx}
+                                    onClick={() => handleAnswer(idx)}
+                                    disabled={isSending || hasAnswered}
+                                    className={`
                                     relative overflow-hidden rounded-2xl p-1 transition-all duration-200
                                     ${containerClass} ${opacityClass}
                                     ${!hasAnswered ? 'active:scale-95 md:hover:scale-[1.02]' : ''}
                                     shadow-xl group
                                 `}
-                            >
-                                <div className={`${contentClass} backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10`}>
-                                    <div className={`
+                                >
+                                    <div className={`${contentClass} backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10`}>
+                                        <div className={`
                                         ${letterClass}
                                         w-10 h-10 md:w-12 md:h-12 rounded-full flex-shrink-0 items-center justify-center text-lg md:text-xl font-black text-white shadow-lg 
                                         bg-gradient-to-br ${gradients[idx % 4]}
                                         absolute top-2 left-3 md:static
                                     `}>
-                                        {letters[idx]}
+                                            {letters[idx]}
+                                        </div>
+                                        <span className={`text-xl md:text-2xl font-bold text-white leading-tight w-full ${textClass}`}>{opt}</span>
                                     </div>
-                                    <span className={`text-xl md:text-2xl font-bold text-white leading-tight w-full ${textClass}`}>{opt}</span>
-                                </div>
-                                {/* Border gradient background (Desktop only) */}
-                                <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
-                            </button>
-                        );
-                    })}
-                </div>
+                                    {/* Border gradient background (Desktop only) */}
+                                    <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );
