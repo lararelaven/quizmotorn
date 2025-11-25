@@ -151,76 +151,7 @@ export default function StudentGame({ session, player, dispatch }) {
         }
     };
 
-    // --- ANSWER REVEALED VIEW (Teacher shows correct answer) ---
-    if (showAnswer) {
-        const isCorrect = selectedOption === question.correctAnswerIndex;
-
-        // CASE 1: Student answered
-        if (hasAnswered) {
-            return (
-                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center shadow-2xl ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}>
-                        {isCorrect ? <Check className="w-16 h-16 text-white" /> : <X className="w-16 h-16 text-white" />}
-                    </div>
-
-                    <div>
-                        <h1 className="text-4xl font-black mb-2">{isCorrect ? 'Rätt svar!' : 'Tyvärr, fel svar.'}</h1>
-                        <p className="text-slate-400 text-xl">
-                            {isCorrect ? `+${earnedPoints} poäng` : 'Inga poäng denna gång'}
-                        </p>
-                    </div>
-
-                    <div className="bg-slate-800 px-6 py-4 rounded-xl border border-slate-700">
-                        <span className="text-slate-400 uppercase text-xs font-bold tracking-wider">Din totala poäng</span>
-                        <div className="text-3xl font-black text-white">{player.score || 0}</div>
-                    </div>
-
-                    <div className="flex gap-2 items-center bg-black/30 px-4 py-2 rounded-lg mt-8">
-                        <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                        <span className="text-sm font-mono text-indigo-300">Väntar på nästa fråga...</span>
-                    </div>
-                </div>
-            );
-        }
-
-        // CASE 2: Student did NOT answer (Missed Question)
-        return (
-            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
-                <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl bg-orange-500">
-                    <Frown className="w-16 h-16 text-white" />
-                </div>
-
-                <div>
-                    <h1 className="text-4xl font-black mb-2">Missad fråga!</h1>
-                    <p className="text-slate-400 text-xl">
-                        Du hann inte svara i tid
-                    </p>
-                </div>
-
-                <div className="bg-slate-800 px-6 py-4 rounded-xl border border-slate-700">
-                    <span className="text-slate-400 uppercase text-xs font-bold tracking-wider">Det rätta svaret var</span>
-                    <div className="text-3xl font-black text-white mt-2 flex items-center justify-center gap-3">
-                        <span className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shadow-lg bg-gradient-to-br ${gradients[question.correctAnswerIndex % 4]}`}>
-                            {letters[question.correctAnswerIndex]}
-                        </span>
-                        <span>{question.options[question.correctAnswerIndex]}</span>
-                    </div>
-                </div>
-
-                <div className="bg-slate-800 px-6 py-4 rounded-xl border border-slate-700">
-                    <span className="text-slate-400 uppercase text-xs font-bold tracking-wider">Din totala poäng</span>
-                    <div className="text-3xl font-black text-white">{player.score || 0}</div>
-                </div>
-
-                <div className="flex gap-2 items-center bg-black/30 px-4 py-2 rounded-lg mt-8">
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                    <span className="text-sm font-mono text-indigo-300">Väntar på nästa fråga...</span>
-                </div>
-            </div>
-        );
-    }
-
-    // --- MAIN GAME VIEW (Preview + Answering) ---
+    // --- MAIN GAME VIEW (Preview + Answering + Results) ---
     const isPreview = session.settings?.question_state === 'preview';
 
     return (
@@ -229,7 +160,7 @@ export default function StudentGame({ session, player, dispatch }) {
             {session.settings.timerEnabled && (
                 <div className="absolute top-0 left-0 w-full h-2 bg-slate-800 z-50">
                     <div
-                        className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
+                        className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
                             (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
                             }`}
                         style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
@@ -249,7 +180,7 @@ export default function StudentGame({ session, player, dispatch }) {
                 <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
 
                 {/* Hybris Controls - Visible in Preview AND Answering (if not answered) */}
-                {session.settings.gamificationMode === 'hybris' && !hasAnswered && (
+                {session.settings.gamificationMode === 'hybris' && !hasAnswered && !showAnswer && (
                     <div className="flex justify-center gap-2 mb-6 animate-fade-in relative z-50">
                         <button
                             onClick={() => setConfidence('low')}
@@ -288,7 +219,7 @@ export default function StudentGame({ session, player, dispatch }) {
                     <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent animate-slide-up">
                         {question.options.map((opt, idx) => {
                             const isSelected = selectedOption === idx;
-                            const isOther = hasAnswered && !isSelected;
+                            const isCorrect = idx === question.correctAnswerIndex;
 
                             // Base styling
                             let containerClass = "";
@@ -297,34 +228,57 @@ export default function StudentGame({ session, player, dispatch }) {
                             let letterClass = "hidden md:flex"; // Hide letter on mobile
                             let textClass = "text-center md:text-left mt-0 md:mt-0"; // Center text on mobile
 
-                            if (hasAnswered) {
+                            if (showAnswer) {
                                 if (isSelected) {
-                                    // Mobile: Full color + White Ring
-                                    // Desktop: Dark BG + White Ring + Scale
-                                    containerClass = `
-                                    bg-gradient-to-br ${gradients[idx % 4]} 
-                                    md:bg-slate-800 
-                                    ring-4 ring-white scale-[1.02] z-10
-                                `;
+                                    // Selected Answer Styling
+                                    if (isCorrect) {
+                                        // Correct: Green Border
+                                        containerClass = `
+                                            bg-green-600
+                                            md:bg-slate-800 
+                                            ring-4 ring-green-500 scale-[1.02] z-10
+                                        `;
+                                    } else {
+                                        // Incorrect: Red Border
+                                        containerClass = `
+                                            bg-red-600
+                                            md:bg-slate-800 
+                                            ring-4 ring-red-500 scale-[1.02] z-10
+                                        `;
+                                    }
                                     contentClass = "bg-transparent md:bg-slate-900/90";
                                 } else {
-                                    // Mobile: Full color + Opacity
-                                    // Desktop: Dark BG + Opacity
+                                    // Unselected Options: Dimmed
                                     containerClass = `
-                                    bg-gradient-to-br ${gradients[idx % 4]} 
-                                    md:bg-slate-800
-                                `;
+                                        bg-gradient-to-br ${gradients[idx % 4]} 
+                                        md:bg-slate-800
+                                    `;
+                                    contentClass = "bg-transparent md:bg-slate-900/90";
+                                    opacityClass = "opacity-50 grayscale scale-95";
+                                }
+                            } else if (hasAnswered) {
+                                // Waiting for result (Answered but not shown yet)
+                                if (isSelected) {
+                                    containerClass = `
+                                        bg-gradient-to-br ${gradients[idx % 4]} 
+                                        md:bg-slate-800 
+                                        ring-4 ring-white scale-[1.02] z-10
+                                    `;
+                                    contentClass = "bg-transparent md:bg-slate-900/90";
+                                } else {
+                                    containerClass = `
+                                        bg-gradient-to-br ${gradients[idx % 4]} 
+                                        md:bg-slate-800
+                                    `;
                                     contentClass = "bg-transparent md:bg-slate-900/90";
                                     opacityClass = "opacity-50 grayscale scale-95";
                                 }
                             } else {
-                                // Default State
-                                // Mobile: Full color
-                                // Desktop: Dark BG
+                                // Default State (Answering)
                                 containerClass = `
-                                bg-gradient-to-br ${gradients[idx % 4]} 
-                                md:bg-slate-800
-                            `;
+                                    bg-gradient-to-br ${gradients[idx % 4]} 
+                                    md:bg-slate-800
+                                `;
                                 contentClass = "bg-transparent md:bg-slate-900/90";
                             }
 
@@ -332,11 +286,11 @@ export default function StudentGame({ session, player, dispatch }) {
                                 <button
                                     key={idx}
                                     onClick={() => handleAnswer(idx)}
-                                    disabled={isSending || hasAnswered}
+                                    disabled={isSending || hasAnswered || showAnswer}
                                     className={`
                                     relative overflow-hidden rounded-2xl p-1 transition-all duration-200
                                     ${containerClass} ${opacityClass}
-                                    ${!hasAnswered ? 'active:scale-95 md:hover:scale-[1.02]' : ''}
+                                    ${!hasAnswered && !showAnswer ? 'active:scale-95 md:hover:scale-[1.02]' : ''}
                                     shadow-xl group
                                 `}
                                 >
@@ -350,12 +304,41 @@ export default function StudentGame({ session, player, dispatch }) {
                                             {letters[idx]}
                                         </div>
                                         <span className={`text-xl md:text-2xl font-bold text-white leading-tight w-full ${textClass}`}>{opt}</span>
+                                        {showAnswer && isSelected && isCorrect && (
+                                            <Check className="w-8 h-8 text-white absolute top-2 right-2 md:static md:ml-auto animate-bounce" />
+                                        )}
+                                        {showAnswer && isSelected && !isCorrect && (
+                                            <X className="w-8 h-8 text-white absolute top-2 right-2 md:static md:ml-auto animate-pulse" />
+                                        )}
                                     </div>
                                     {/* Border gradient background (Desktop only) */}
                                     <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
                                 </button>
                             );
                         })}
+                    </div>
+                )}
+
+                {/* Result Feedback (Points Delta) */}
+                {showAnswer && hasAnswered && (
+                    <div className="mt-6 text-center animate-fade-in">
+                        <div className={`text-4xl font-black ${earnedPoints > 0 ? 'text-green-400' : earnedPoints < 0 ? 'text-red-400' : 'text-slate-400'}`}>
+                            {earnedPoints > 0 ? `+${earnedPoints}` : earnedPoints} p
+                        </div>
+                        <div className="text-slate-400 text-sm font-bold uppercase tracking-wider mt-1">
+                            {earnedPoints > 0 ? 'Bra jobbat!' : 'Bättre lycka nästa gång'}
+                        </div>
+                    </div>
+                )}
+
+                {showAnswer && !hasAnswered && (
+                    <div className="mt-6 text-center animate-fade-in">
+                        <div className="text-4xl font-black text-orange-400">
+                            Missad!
+                        </div>
+                        <div className="text-slate-400 text-sm font-bold uppercase tracking-wider mt-1">
+                            Du hann inte svara
+                        </div>
                     </div>
                 )}
             </div>
