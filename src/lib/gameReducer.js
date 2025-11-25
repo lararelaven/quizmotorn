@@ -169,15 +169,22 @@ export const gameReducer = (state, action) => {
         }
         case 'UPDATE_SESSION': {
             // Uppdatera sessionen med ny data från servern (t.ex. current_question_index, status)
+            const newState = {
+                ...state.session,
+                ...action.payload,
+                // Behåll quizData och settings om de inte överskrivs (vilket de inte borde av en enkel update)
+                quizData: state.session.quizData,
+                settings: { ...state.session.settings, ...action.payload.settings }
+            };
+
+            // VIKTIGT: Mappa snake_case från DB till camelCase för state
+            if (action.payload.current_question_index !== undefined) {
+                newState.currentQuestionIndex = action.payload.current_question_index;
+            }
+
             return {
                 ...state,
-                session: {
-                    ...state.session,
-                    ...action.payload,
-                    // Behåll quizData och settings om de inte överskrivs (vilket de inte borde av en enkel update)
-                    quizData: state.session.quizData,
-                    settings: { ...state.session.settings, ...action.payload.settings }
-                }
+                session: newState
             };
         }
         case 'ADD_PLAYER': // Bytte namn för att vara tydlig (samma som PLAYER_JOIN)
