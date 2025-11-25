@@ -33,7 +33,7 @@ export default function StudentGame({ session, player, dispatch }) {
         if (session.settings.timerEnabled) {
             setTimeLeft(session.settings.timerDuration);
         }
-    }, [questionIndex, session.settings.timerEnabled, session.settings.timerDuration]);
+    }, [question, questionIndex, session.settings.timerEnabled, session.settings.timerDuration]);
 
     // Timer logic (Sync with teacher's timer roughly)
     useEffect(() => {
@@ -286,11 +286,23 @@ export default function StudentGame({ session, player, dispatch }) {
                     </div>
                 )}
 
-                {/* Options Grid - Mobile Optimized (Round 6) */}
+                {/* Options Grid - Styled like Teacher View (Desktop Match) */}
                 <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent">
                     {question.options.map((opt, idx) => {
                         const isSelected = selectedOption === idx;
                         const isOther = hasAnswered && !isSelected;
+
+                        // Base styling
+                        let containerClass = "bg-slate-800";
+                        let opacityClass = "opacity-100";
+
+                        if (hasAnswered) {
+                            if (isSelected) {
+                                containerClass = "bg-slate-800 ring-4 ring-white scale-[1.02] z-10";
+                            } else {
+                                opacityClass = "opacity-50 grayscale scale-95";
+                            }
+                        }
 
                         return (
                             <button
@@ -298,34 +310,24 @@ export default function StudentGame({ session, player, dispatch }) {
                                 onClick={() => handleAnswer(idx)}
                                 disabled={isSending || hasAnswered}
                                 className={`
-                                    relative overflow-hidden p-1 transition-all duration-200
-                                    ${isOther ? 'opacity-50 grayscale scale-95' : ''}
-                                    ${isSelected ? 'ring-4 ring-white scale-[1.02] z-10' : ''}
+                                    relative overflow-hidden rounded-2xl p-1 transition-all duration-200
+                                    ${containerClass} ${opacityClass}
                                     ${!hasAnswered ? 'active:scale-95 md:hover:scale-[1.02]' : ''}
-                                    md:bg-slate-800 md:rounded-2xl
+                                    shadow-xl group
                                 `}
                             >
-                                {/* Mobile: Full background color. Desktop: Dark background with gradient icon */}
-                                <div className={`
-                                    h-full w-full p-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left md:rounded-xl
-                                    bg-gradient-to-br ${gradients[idx % 4]} md:bg-none md:bg-slate-900/90 md:backdrop-blur-sm
-                                `}>
-                                    {/* Letter: Absolute Top-Left on Mobile, Icon on Desktop */}
+                                <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left">
                                     <div className={`
-                                        absolute top-2 left-3 text-white/80 font-black text-xl
-                                        md:static md:w-10 md:h-10 md:rounded-full md:flex-shrink-0 md:flex md:items-center md:justify-center md:text-lg md:text-white md:shadow-lg md:bg-gradient-to-br md:${gradients[idx % 4]}
+                                        w-10 h-10 md:w-12 md:h-12 rounded-full flex-shrink-0 flex items-center justify-center text-lg md:text-xl font-black text-white shadow-lg 
+                                        bg-gradient-to-br ${gradients[idx % 4]}
+                                        absolute top-2 left-3 md:static
                                     `}>
                                         {letters[idx]}
                                     </div>
-
-                                    {/* Option Text: Larger on Mobile */}
-                                    <span className="text-xl md:text-lg font-bold text-white leading-tight w-full drop-shadow-md md:drop-shadow-none mt-4 md:mt-0">
-                                        {opt}
-                                    </span>
+                                    <span className="text-xl md:text-2xl font-bold text-white leading-tight w-full mt-8 md:mt-0">{opt}</span>
                                 </div>
-
-                                {/* Desktop only: Border gradient background */}
-                                <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+                                {/* Border gradient background */}
+                                <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
                             </button>
                         );
                     })}
