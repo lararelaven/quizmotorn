@@ -456,19 +456,21 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     </h2>
                 </div>
 
-                {/* Options Grid - Styled like Student View */}
+                {/* Options Grid - Styled like Student Desktop View */}
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl transition-opacity duration-500 ${isPreview ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {question.options.map((opt, idx) => {
                         const isCorrect = idx === question.correctAnswerIndex;
                         const showResult = showAnswer;
 
                         // Base styling
-                        let containerClass = "bg-slate-800";
+                        let containerClass = `bg-gradient-to-br ${gradients[idx % 4]}`;
                         let opacityClass = "opacity-100";
+                        let contentClass = "bg-slate-900/90";
 
                         if (showResult) {
                             if (isCorrect) {
-                                containerClass = "bg-green-600 ring-4 ring-green-400/50 scale-[1.02] z-10";
+                                containerClass += " ring-4 ring-green-400/50 scale-[1.02] z-10";
+                                contentClass = "bg-slate-900/90"; // Keep dark bg
                             } else {
                                 opacityClass = "opacity-50 grayscale";
                             }
@@ -484,7 +486,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                     shadow-xl group
                                 `}
                             >
-                                <div className="bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex items-center gap-3 md:gap-4 relative z-10 text-left">
+                                <div className={`${contentClass} backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex items-center gap-3 md:gap-4 relative z-10 text-left`}>
                                     <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex-shrink-0 flex items-center justify-center text-lg md:text-xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
                                         {letters[idx]}
                                     </div>
