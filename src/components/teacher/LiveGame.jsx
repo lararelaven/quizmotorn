@@ -554,13 +554,18 @@ export default function TeacherLiveGame({ session, dispatch }) {
             {/* Exit Confirm Modal */}
             {showExitConfirm && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center">
+                    <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center relative">
+                        <button
+                            onClick={() => setShowExitConfirm(false)}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
                         <h3 className="text-2xl font-bold text-white mb-2">Avsluta sessionen?</h3>
-                        <p className="text-slate-400 mb-8">Alla deltagare kommer att kopplas bort.</p>
+                        <p className="text-slate-400 mb-8">Är du säker?</p>
                         <div className="flex gap-4">
                             <button onClick={handleEndGame} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-all">Resultat</button>
                             <button onClick={handleCloseSession} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all">Stäng</button>
-                            <button onClick={() => setShowExitConfirm(false)} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors">Avbryt</button>
                         </div>
                     </div>
                 </div>

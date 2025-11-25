@@ -1,10 +1,8 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Check, Loader2, Trophy, Frown, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import StudentFinished from './Finished';
+import { Loader2, Check, X, Frown } from 'lucide-react';
 
-// Constants for answer options
 const letters = ['A', 'B', 'C', 'D'];
 const gradients = [
     'from-pink-500 to-rose-500',
@@ -14,23 +12,12 @@ const gradients = [
 ];
 
 export default function StudentGame({ session, player, dispatch }) {
-    const questionIndex = session?.current_question_index ?? 0;
-
-    // Safety check
-    if (!session?.quizData?.questions) {
-        return <div className="text-white text-center p-10">Laddar quizdata...</div>;
-    }
-
-    // Check if quiz is finished (questionIndex out of bounds OR status is finished)
-    if (questionIndex >= session.quizData.questions.length || session.status === 'finished') {
-        return <StudentFinished player={player} dispatch={dispatch} />;
-    }
-
+    const questionIndex = session.currentQuestionIndex;
     const question = session.quizData.questions[questionIndex];
-    const showAnswer = session.settings?.showAnswer || false;
+    const showAnswer = session.settings.showAnswer;
 
-    const [hasAnswered, setHasAnswered] = useState(false);
     const [selectedOption, setSelectedOption] = useState(null);
+    const [hasAnswered, setHasAnswered] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [timeLeft, setTimeLeft] = useState(session.settings.timerEnabled ? session.settings.timerDuration : null);
     const [earnedPoints, setEarnedPoints] = useState(0);
@@ -235,26 +222,8 @@ export default function StudentGame({ session, player, dispatch }) {
         );
     }
 
-    // --- WAITING VIEW (Answered, but teacher hasn't revealed yet) ---
-    if (hasAnswered) {
-        return (
-            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center space-y-8 animate-fade-in">
-                <div className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[selectedOption % 4]}`}>
-                    {letters[selectedOption]}
-                </div>
-
-                <div>
-                    <h1 className="text-3xl font-black mb-2">Du svarade {letters[selectedOption]}</h1>
-                    <p className="text-slate-400 text-lg">Vänta på resultatet...</p>
-                </div>
-
-                <div className="flex gap-2 items-center bg-black/30 px-4 py-2 rounded-lg">
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                    <span className="text-sm font-mono text-indigo-300">Synkar med läraren</span>
-                </div>
-            </div>
-        );
-    }
+    // --- WAITING VIEW REMOVED ---
+    // We now stay in the Question View but with updated styling for options
 
     // --- QUESTION VIEW (Answering) ---
     return (
@@ -264,7 +233,7 @@ export default function StudentGame({ session, player, dispatch }) {
                 <div className="absolute top-0 left-0 w-full h-2 bg-slate-800 z-50">
                     <div
                         className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
-                                (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
+                            (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
                             }`}
                         style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
                     />
@@ -284,41 +253,47 @@ export default function StudentGame({ session, player, dispatch }) {
 
                 {/* Options Grid - Mobile Optimized (Round 6) */}
                 <div className="grid grid-cols-2 gap-2 w-full fixed bottom-0 left-0 h-[50vh] md:relative md:h-auto md:gap-4 md:p-0 z-40 bg-slate-900 md:bg-transparent">
-                    {question.options.map((opt, idx) => (
-                        <button
-                            key={idx}
-                            onClick={() => handleAnswer(idx)}
-                            disabled={isSending}
-                            className={`
-                                relative overflow-hidden p-1 transition-all duration-200
-                                ${isSending && selectedOption !== idx ? 'opacity-50 grayscale' : 'active:scale-95'}
-                                md:bg-slate-800
-                                md:rounded-2xl md:hover:scale-[1.02]
-                            `}
-                        >
-                            {/* Mobile: Full background color. Desktop: Dark background with gradient icon */}
-                            <div className={`
-                                h-full w-full p-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left md:rounded-xl
-                                bg-gradient-to-br ${gradients[idx % 4]} md:bg-none md:bg-slate-900/90 md:backdrop-blur-sm
-                            `}>
-                                {/* Letter: Absolute Top-Left on Mobile, Icon on Desktop */}
+                    {question.options.map((opt, idx) => {
+                        const isSelected = selectedOption === idx;
+                        const isOther = hasAnswered && !isSelected;
+
+                        return (
+                            <button
+                                key={idx}
+                                onClick={() => handleAnswer(idx)}
+                                disabled={isSending || hasAnswered}
+                                className={`
+                                    relative overflow-hidden p-1 transition-all duration-200
+                                    ${isOther ? 'opacity-50 grayscale scale-95' : ''}
+                                    ${isSelected ? 'ring-4 ring-white scale-[1.02] z-10' : ''}
+                                    ${!hasAnswered ? 'active:scale-95 md:hover:scale-[1.02]' : ''}
+                                    md:bg-slate-800 md:rounded-2xl
+                                `}
+                            >
+                                {/* Mobile: Full background color. Desktop: Dark background with gradient icon */}
                                 <div className={`
-                                    absolute top-2 left-3 text-white/80 font-black text-xl
-                                    md:static md:w-10 md:h-10 md:rounded-full md:flex-shrink-0 md:flex md:items-center md:justify-center md:text-lg md:text-white md:shadow-lg md:bg-gradient-to-br md:${gradients[idx % 4]}
+                                    h-full w-full p-4 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 relative z-10 text-center md:text-left md:rounded-xl
+                                    bg-gradient-to-br ${gradients[idx % 4]} md:bg-none md:bg-slate-900/90 md:backdrop-blur-sm
                                 `}>
-                                    {letters[idx]}
+                                    {/* Letter: Absolute Top-Left on Mobile, Icon on Desktop */}
+                                    <div className={`
+                                        absolute top-2 left-3 text-white/80 font-black text-xl
+                                        md:static md:w-10 md:h-10 md:rounded-full md:flex-shrink-0 md:flex md:items-center md:justify-center md:text-lg md:text-white md:shadow-lg md:bg-gradient-to-br md:${gradients[idx % 4]}
+                                    `}>
+                                        {letters[idx]}
+                                    </div>
+
+                                    {/* Option Text: Larger on Mobile */}
+                                    <span className="text-xl md:text-lg font-bold text-white leading-tight w-full drop-shadow-md md:drop-shadow-none mt-4 md:mt-0">
+                                        {opt}
+                                    </span>
                                 </div>
 
-                                {/* Option Text: Larger on Mobile */}
-                                <span className="text-xl md:text-lg font-bold text-white leading-tight w-full drop-shadow-md md:drop-shadow-none mt-4 md:mt-0">
-                                    {opt}
-                                </span>
-                            </div>
-
-                            {/* Desktop only: Border gradient background */}
-                            <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
-                        </button>
-                    ))}
+                                {/* Desktop only: Border gradient background */}
+                                <div className={`hidden md:block absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
         </div>
