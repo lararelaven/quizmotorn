@@ -232,23 +232,32 @@ export default function StudentGame({ session, player, dispatch }) {
                                 if (isSelected) {
                                     // Selected Answer Styling
                                     if (isCorrect) {
-                                        // Correct: Green Border
+                                        // Correct: Full Green Background (Mobile & Desktop)
                                         containerClass = `
                                             bg-green-600
-                                            md:bg-slate-800 
+                                            md:bg-green-600 
                                             ring-4 ring-green-500 scale-[1.02] z-10
                                         `;
                                     } else {
-                                        // Incorrect: Red Border
+                                        // Incorrect: Full Red Background (Mobile & Desktop)
                                         containerClass = `
                                             bg-red-600
-                                            md:bg-slate-800 
+                                            md:bg-red-600 
                                             ring-4 ring-red-500 scale-[1.02] z-10
                                         `;
                                     }
-                                    contentClass = "bg-transparent md:bg-slate-900/90";
+                                    // Transparent content so background shows through
+                                    contentClass = "bg-transparent md:bg-transparent";
+                                } else if (isCorrect) {
+                                    // Correct Answer (Not Selected): Dimmed Green Highlight
+                                    containerClass = `
+                                        bg-green-600/30
+                                        md:bg-green-600/30
+                                        ring-2 ring-green-500/50 scale-[1.02] z-10
+                                    `;
+                                    contentClass = "bg-transparent md:bg-transparent";
                                 } else {
-                                    // Unselected Options: Dimmed
+                                    // Unselected & Incorrect Options: Dimmed
                                     containerClass = `
                                         bg-gradient-to-br ${gradients[idx % 4]} 
                                         md:bg-slate-800
