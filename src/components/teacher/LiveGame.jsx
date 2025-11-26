@@ -353,7 +353,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
             {/* Timer Bar (Top Center) - Only if enabled - NOW OVER EVERYTHING */}
             {session.settings.timerEnabled && (
-                <div className="absolute top-0 left-0 w-full h-2 bg-slate-800 z-50">
+                <div className="fixed top-0 left-0 w-full h-2 bg-slate-800 z-50">
                     <div
                         className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
                             (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
@@ -473,68 +473,65 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     </div>
                 )}
 
-                {/* Preview Indicator */}
-                {isPreview && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm z-50">
-                        <div className="text-center animate-in zoom-in duration-300">
-                            <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(79,70,229,0.5)] animate-pulse">
-                                <Loader2 className="w-12 h-12 text-white animate-spin" />
-                            </div>
-                            <h3 className="text-4xl font-black text-white mb-2">Gör dig redo!</h3>
-                            <p className="text-xl text-indigo-300">Svarsalternativen visas om {Math.ceil(timeLeft || 0)}s</p>
+                {/* Content Switch: Preview vs Options */}
+                {isPreview ? (
+                    <div className="flex flex-col items-center justify-center py-12 animate-in zoom-in duration-300">
+                        <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(79,70,229,0.5)] animate-pulse">
+                            <Loader2 className="w-12 h-12 text-white animate-spin" />
                         </div>
+                        <h3 className="text-4xl font-black text-white mb-2">Gör dig redo!</h3>
+                        <p className="text-xl text-indigo-300">Svarsalternativen kommer snart...</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl animate-in fade-in slide-in-from-bottom-8 duration-500">
+                        {question.options.map((opt, idx) => {
+                            const isCorrect = idx === question.correctAnswerIndex;
+                            const showResult = showAnswer;
+
+                            // Teacher View Styling (Letter + Dark BG + Colored Border)
+                            let containerClass = `
+                                relative overflow-hidden rounded-2xl p-1 transition-all duration-300
+                                bg-gradient-to-br ${gradients[idx % 4]}
+                                shadow-lg
+                            `;
+
+                            let contentClass = "bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-6 flex items-center gap-6 relative z-10";
+                            let opacityClass = "opacity-100";
+
+                            if (showResult) {
+                                if (isCorrect) {
+                                    containerClass += " ring-4 ring-green-400/50 scale-[1.02] z-10";
+                                } else {
+                                    opacityClass = "opacity-50 grayscale";
+                                }
+                            }
+
+                            return (
+                                <div key={idx} className={`${containerClass} ${opacityClass}`}>
+                                    <div className={contentClass}>
+                                        {/* Letter Circle */}
+                                        <div className={`
+                                            w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-black text-white shadow-lg
+                                            bg-gradient-to-br ${gradients[idx % 4]}
+                                        `}>
+                                            {letters[idx]}
+                                        </div>
+
+                                        {/* Option Text */}
+                                        <span className="text-2xl font-bold text-white leading-tight">{opt}</span>
+
+                                        {/* Result Icons */}
+                                        {showResult && isCorrect && (
+                                            <CheckCircle className="w-8 h-8 text-green-400 ml-auto animate-bounce" />
+                                        )}
+                                    </div>
+                                    {/* Border gradient background */}
+                                    <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
-
-                {/* Options Grid */}
-                <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl transition-opacity duration-500 ${isPreview ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                    {question.options.map((opt, idx) => {
-                        const isCorrect = idx === question.correctAnswerIndex;
-                        const showResult = showAnswer;
-
-                        // Teacher View Styling (Letter + Dark BG + Colored Border)
-                        let containerClass = `
-                            relative overflow-hidden rounded-2xl p-1 transition-all duration-300
-                            bg-gradient-to-br ${gradients[idx % 4]}
-                            shadow-lg
-                        `;
-
-                        let contentClass = "bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-6 flex items-center gap-6 relative z-10";
-                        let opacityClass = "opacity-100";
-
-                        if (showResult) {
-                            if (isCorrect) {
-                                containerClass += " ring-4 ring-green-400/50 scale-[1.02] z-10";
-                            } else {
-                                opacityClass = "opacity-50 grayscale";
-                            }
-                        }
-
-                        return (
-                            <div key={idx} className={`${containerClass} ${opacityClass}`}>
-                                <div className={contentClass}>
-                                    {/* Letter Circle */}
-                                    <div className={`
-                                        w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-black text-white shadow-lg
-                                        bg-gradient-to-br ${gradients[idx % 4]}
-                                    `}>
-                                        {letters[idx]}
-                                    </div>
-
-                                    {/* Option Text */}
-                                    <span className="text-2xl font-bold text-white leading-tight">{opt}</span>
-
-                                    {/* Result Icons */}
-                                    {showResult && isCorrect && (
-                                        <CheckCircle className="w-8 h-8 text-green-400 ml-auto animate-bounce" />
-                                    )}
-                                </div>
-                                {/* Border gradient background */}
-                                <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
-                            </div>
-                        );
-                    })}
-                </div>
 
                 {/* Controls (Next / Show Answer) */}
                 {!isPreview && (
