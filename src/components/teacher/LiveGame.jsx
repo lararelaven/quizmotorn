@@ -127,6 +127,25 @@ export default function TeacherLiveGame({ session, dispatch }) {
         }
     }, [answersCount, totalPlayers, session.settings?.question_state, showAnswer]);
 
+    // --- Timer Countdown Logic ---
+    useEffect(() => {
+        if (
+            session.settings?.question_state !== 'answering' ||
+            !session.settings.timerEnabled ||
+            showAnswer
+        ) {
+            return;
+        }
+
+        if (timeLeft === null || timeLeft === 0) return;
+
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [timeLeft, session.settings?.question_state, session.settings.timerEnabled, showAnswer]);
+
     // --- Hantera Preview-fasen automatiskt via useEffect ---
     useEffect(() => {
         if (session.settings?.question_state === 'preview') {
