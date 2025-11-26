@@ -31,6 +31,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     const totalPlayers = connectedPlayers.length;
 
     const scrollRef = useRef(null);
+    const channelRef = useRef(null);
 
     // --- Lyssna på inkommande svar OCH poänguppdateringar (för leaderboard) ---
     useEffect(() => {
@@ -51,8 +52,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
         };
         fetchPlayers();
 
+        // Use session-specific channel for isolation and broadcasting
         const channel = supabase
-            .channel('game_answers_live')
+            .channel(`student_game_${session.id}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
@@ -73,10 +75,12 @@ export default function TeacherLiveGame({ session, dispatch }) {
             )
             .subscribe();
 
+        channelRef.current = channel;
         fetchTopPlayers(); // Hämta initialt
 
         return () => {
             supabase.removeChannel(channel);
+            channelRef.current = null;
         };
     }, [session.currentQuestionIndex, session.id]);
 
@@ -177,9 +181,17 @@ export default function TeacherLiveGame({ session, dispatch }) {
     };
 
     const handleKickPlayer = async (playerId) => {
-        // Direkt borttagning utan konfirmation
+        // 1. Skicka broadcast event först (så eleven vet att hen ska lämna)
+        if (channelRef.current) {
+            await channelRef.current.send({
+                type: 'broadcast',
+                event: 'kick-player',
+                payload: { playerId }
+            });
+        }
+
+        // 2. Ta bort från DB
         await supabase.from('players').delete().eq('id', playerId);
-        // Realtime lyssnaren kommer uppdatera listan
     };
 
     const handleEndGame = async () => {
@@ -418,7 +430,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                         );
                                     })}
                                     {connectedPlayers.length === 0 && (
-                                        <div className="p-4 text-center text-slate-500 text-sm">Inga deltagare anslutna</div>
+                                        <div className="p-4 text-center text-slate-500 text-sm">
+                                            Inga deltagare än
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -427,71 +441,93 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
                     <button
                         onClick={() => setShowExitConfirm(true)}
-                        className="p-2 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors backdrop-blur-md bg-slate-950/30"
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-2 rounded-lg border border-red-500/20 transition-colors"
+                        title="Avsluta session"
                     >
-                        <StopCircle className="w-6 h-6" />
+                        <StopCircle className="w-5 h-5" />
                     </button>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 overflow-y-auto mt-16" ref={scrollRef}>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative z-10">
 
-                {/* Question Card */}
-                <div className="w-full max-w-4xl mb-8 animate-slide-up">
-                    {question.image && (
-                        <div className="mb-6 relative group cursor-zoom-in" onClick={() => setZoomImage(question.image)}>
-                            <img
-                                src={question.image}
-                                alt="Question"
-                                className="w-full h-64 md:h-80 object-cover rounded-2xl shadow-2xl border border-white/10 group-hover:brightness-110 transition-all"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 rounded-2xl">
-                                <Maximize2 className="w-12 h-12 text-white drop-shadow-lg" />
-                            </div>
-                        </div>
-                    )}
-                    <h2 className={`${questionTextSize} font-bold text-white text-center leading-tight drop-shadow-xl`}>
+                {/* Question Text */}
+                <div className="w-full max-w-5xl text-center mb-8 md:mb-12">
+                    <h2 className={`${questionTextSize} font-black text-white leading-tight drop-shadow-lg`}>
                         {question.question}
                     </h2>
                 </div>
 
-                {/* Options Grid - Styled like Student Desktop View */}
+                {/* Image (if exists) */}
+                {question.image && (
+                    <div className="mb-8 relative group cursor-zoom-in" onClick={() => setZoomImage(question.image)}>
+                        <img
+                            src={question.image}
+                            alt="Question"
+                            className="max-h-[30vh] rounded-2xl shadow-2xl border-4 border-white/10 group-hover:scale-[1.02] transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 rounded-2xl">
+                            <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
+                        </div>
+                    </div>
+                )}
+
+                {/* Preview Indicator */}
+                {isPreview && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm z-50">
+                        <div className="text-center animate-in zoom-in duration-300">
+                            <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(79,70,229,0.5)] animate-pulse">
+                                <Loader2 className="w-12 h-12 text-white animate-spin" />
+                            </div>
+                            <h3 className="text-4xl font-black text-white mb-2">Gör dig redo!</h3>
+                            <p className="text-xl text-indigo-300">Svarsalternativen visas om {Math.ceil(timeLeft || 0)}s</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Options Grid */}
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl transition-opacity duration-500 ${isPreview ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {question.options.map((opt, idx) => {
                         const isCorrect = idx === question.correctAnswerIndex;
                         const showResult = showAnswer;
 
-                        // Base styling
-                        let containerClass = `bg-gradient-to-br ${gradients[idx % 4]}`;
+                        // Teacher View Styling (Letter + Dark BG + Colored Border)
+                        let containerClass = `
+                            relative overflow-hidden rounded-2xl p-1 transition-all duration-300
+                            bg-gradient-to-br ${gradients[idx % 4]}
+                            shadow-lg
+                        `;
+
+                        let contentClass = "bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-6 flex items-center gap-6 relative z-10";
                         let opacityClass = "opacity-100";
-                        let contentClass = "bg-slate-900/90";
 
                         if (showResult) {
                             if (isCorrect) {
                                 containerClass += " ring-4 ring-green-400/50 scale-[1.02] z-10";
-                                contentClass = "bg-slate-900/90"; // Keep dark bg
                             } else {
                                 opacityClass = "opacity-50 grayscale";
                             }
                         }
 
                         return (
-                            <div
-                                key={idx}
-                                className={`
-                                    relative overflow-hidden rounded-2xl p-1 transition-all duration-200
-                                    ${containerClass} ${opacityClass}
-                                    ${!showResult ? 'hover:scale-[1.02]' : ''}
-                                    shadow-xl group
-                                `}
-                            >
-                                <div className={`${contentClass} backdrop-blur-sm h-full w-full rounded-xl p-4 md:p-6 flex items-center gap-3 md:gap-4 relative z-10 text-left`}>
-                                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex-shrink-0 flex items-center justify-center text-lg md:text-xl font-black text-white shadow-lg bg-gradient-to-br ${gradients[idx % 4]}`}>
+                            <div key={idx} className={`${containerClass} ${opacityClass}`}>
+                                <div className={contentClass}>
+                                    {/* Letter Circle */}
+                                    <div className={`
+                                        w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-black text-white shadow-lg
+                                        bg-gradient-to-br ${gradients[idx % 4]}
+                                    `}>
                                         {letters[idx]}
                                     </div>
-                                    <span className="text-xl md:text-2xl font-bold text-white leading-tight w-full">{opt}</span>
-                                    {showResult && isCorrect && <CheckCircle className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 text-white animate-bounce" />}
+
+                                    {/* Option Text */}
+                                    <span className="text-2xl font-bold text-white leading-tight">{opt}</span>
+
+                                    {/* Result Icons */}
+                                    {showResult && isCorrect && (
+                                        <CheckCircle className="w-8 h-8 text-green-400 ml-auto animate-bounce" />
+                                    )}
                                 </div>
                                 {/* Border gradient background */}
                                 <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
@@ -500,85 +536,79 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     })}
                 </div>
 
-                {/* Explanation Text (Only shown after answer) */}
-                {showAnswer && question.explanation && (
-                    <div className="w-full max-w-5xl mt-8 p-6 bg-indigo-900/30 border border-indigo-500/30 rounded-2xl animate-fade-in">
-                        <h3 className="text-indigo-300 font-bold mb-2 flex items-center gap-2">
-                            <Monitor className="w-5 h-5" /> Förklaring
-                        </h3>
-                        <p className="text-white text-lg leading-relaxed">
-                            {question.explanation}
-                        </p>
-                    </div>
-                )}
-
-                {/* Preview Indicator */}
-                {isPreview && (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-32">
-                        <div className="flex flex-col items-center gap-2 animate-pulse">
-                            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-                            <span className="text-indigo-300 font-bold tracking-widest uppercase text-sm">Gör dig redo...</span>
-                        </div>
-                    </div>
-                )}
-
-            </div>
-
-            {/* Floating Action Button */}
-            <div className="fixed bottom-8 right-8 z-50">
-                {!showAnswer ? (
-                    <button
-                        onClick={handleShowAnswer}
-                        className="bg-white text-slate-900 px-8 py-4 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all shadow-2xl flex items-center gap-2 shadow-indigo-500/20"
-                    >
-                        <Monitor className="w-6 h-6" /> Visa Svar
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleNextQuestion}
-                        className={`
-                            px-8 py-4 rounded-full font-black text-xl hover:scale-105 transition-all shadow-2xl flex items-center gap-2
-                            ${isLastQuestion
-                                ? 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-yellow-500/30'
-                                : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/30'
-                            }
-                        `}
-                    >
-                        {isLastQuestion ? (
-                            <>Resultat <Trophy className="w-6 h-6" /></>
+                {/* Controls (Next / Show Answer) */}
+                {!isPreview && (
+                    <div className="mt-12 flex justify-center gap-4 relative z-50">
+                        {!showAnswer ? (
+                            <button
+                                onClick={handleShowAnswer}
+                                className="px-12 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.3)] flex items-center gap-3"
+                            >
+                                <Monitor className="w-6 h-6" /> Visa Svar
+                            </button>
                         ) : (
-                            <>Nästa Fråga <ArrowRight className="w-6 h-6" /></>
+                            <button
+                                onClick={isLastQuestion ? handleEndGame : handleNextQuestion}
+                                className="px-12 py-4 bg-indigo-600 text-white rounded-full font-black text-xl hover:bg-indigo-500 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(79,70,229,0.5)] flex items-center gap-3"
+                            >
+                                {isLastQuestion ? (
+                                    <>
+                                        <Trophy className="w-6 h-6" /> Avsluta Spel
+                                    </>
+                                ) : (
+                                    <>
+                                        Nästa Fråga <ArrowRight className="w-6 h-6" />
+                                    </>
+                                )}
+                            </button>
                         )}
-                    </button>
+                    </div>
                 )}
-            </div>
 
-            {/* Exit Confirm Modal */}
-            {showExitConfirm && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 border border-white/10 p-8 rounded-3xl shadow-2xl max-w-md w-full text-center relative">
-                        <button
-                            onClick={() => setShowExitConfirm(false)}
-                            className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
-                        <h3 className="text-2xl font-bold text-white mb-2">Avsluta sessionen?</h3>
-                        <p className="text-slate-400 mb-8">Är du säker?</p>
-                        <div className="flex gap-4">
-                            <button onClick={handleEndGame} className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-all">Resultat</button>
-                            <button onClick={handleCloseSession} className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all">Stäng</button>
+                {/* Exit Confirm Modal */}
+                {showExitConfirm && (
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                        <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200 relative">
+                            <button
+                                onClick={() => setShowExitConfirm(false)}
+                                className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+
+                            <h3 className="text-2xl font-black text-white mb-4">Avsluta sessionen?</h3>
+                            <p className="text-slate-300 mb-8">
+                                Detta kommer att avsluta spelet för alla deltagare. Är du säker?
+                            </p>
+
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => {
+                                        setShowExitConfirm(false);
+                                        handleEndGame();
+                                    }}
+                                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-all"
+                                >
+                                    Resultat
+                                </button>
+                                <button
+                                    onClick={handleCloseSession}
+                                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all"
+                                >
+                                    Stäng
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Image Zoom Modal */}
-            {zoomImage && (
-                <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomImage(null)}>
-                    <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in duration-300" />
-                </div>
-            )}
+                {/* Image Zoom Modal */}
+                {zoomImage && (
+                    <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomImage(null)}>
+                        <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in duration-300" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -76,10 +76,22 @@ export default function StudentGame({ session, player, dispatch }) {
                     filter: `id=eq.${player.id}`,
                 },
                 () => {
-                    // Player was kicked
+                    // Player was kicked (fallback via DB)
                     alert("Du har blivit borttagen från spelet.");
                     dispatch({ type: 'RESET_APP' });
                     window.location.href = '/';
+                }
+            )
+            .on(
+                'broadcast',
+                { event: 'kick-player' },
+                (payload) => {
+                    // Player was kicked (via broadcast)
+                    if (payload.payload.playerId === player.id) {
+                        alert("Du har blivit borttagen från spelet.");
+                        dispatch({ type: 'RESET_APP' });
+                        window.location.href = '/';
+                    }
                 }
             )
             .subscribe();
