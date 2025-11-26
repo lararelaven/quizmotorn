@@ -5,6 +5,7 @@ import { Mail, Key, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function TeacherLogin({ dispatch }) {
+    // Force rebuild 1
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSignUp, setIsSignUp] = useState(false);
