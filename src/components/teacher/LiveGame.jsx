@@ -188,6 +188,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
     }, [answersCount, totalPlayers, showAnswer, session.settings?.question_state]);
 
     const handleKickPlayer = async (playerId) => {
+        // Optimistic update: Remove player immediately from UI
+        setConnectedPlayers(prev => prev.filter(p => p.id !== playerId));
+
         // 1. Skicka broadcast event först (så eleven vet att hen ska lämna)
         if (channelRef.current) {
             await channelRef.current.send({
@@ -287,7 +290,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
     }, [isFinished]);
 
     if (isFinished) {
-        // ... (Resultatvy - behålls som den är för nu, fokus på spelvyn)
         const sortedPlayers = [...(topPlayers.length > 0 ? topPlayers : connectedPlayers || [])]
             .sort((a, b) => b.score - a.score)
             .slice(0, 3);
@@ -297,7 +299,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 animate-pulse"></div>
                 <Trophy className="w-32 h-32 text-yellow-400 mb-8 animate-bounce drop-shadow-[0_0_35px_rgba(250,204,21,0.6)]" />
                 <h1 className="text-7xl font-black mb-16 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 drop-shadow-sm">Resultat</h1>
-                {/* ... (Resten av resultatvyn) ... */}
+
                 <div className="flex items-end justify-center gap-4 md:gap-8 w-full max-w-4xl mb-12 perspective-1000">
                     {/* 2nd Place */}
                     {sortedPlayers[1] && (
@@ -552,7 +554,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                             </button>
                         ) : (
                             <button
-                                onClick={isLastQuestion ? handleEndGame : handleNextQuestion}
+                                onClick={handleNextQuestion}
                                 className="px-12 py-4 bg-indigo-600 text-white rounded-full font-black text-xl hover:bg-indigo-500 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(79,70,229,0.5)] flex items-center gap-3"
                             >
                                 {isLastQuestion ? (
@@ -569,16 +571,21 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     </div>
                 )}
 
-                {/* Exit Confirm Modal */}
+                {/* Exit Confirmation Modal */}
                 {showExitConfirm && (
-                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                        <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200 relative">
-                            <button
-                                onClick={() => setShowExitConfirm(false)}
-                                className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
+                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                                    <StopCircle className="w-6 h-6 text-red-400" />
+                                </div>
+                                <button
+                                    onClick={() => setShowExitConfirm(false)}
+                                    className="text-slate-400 hover:text-white transition-colors"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
 
                             <h3 className="text-2xl font-black text-white mb-4">Avsluta sessionen?</h3>
                             <p className="text-slate-300 mb-8">
