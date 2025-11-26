@@ -35,6 +35,26 @@ export default function StudentGame({ session, player, dispatch }) {
         }
     }, [question, questionIndex, session.settings.timerEnabled, session.settings.timerDuration]);
 
+    // Verify player existence on mount (in case of race condition kick)
+    useEffect(() => {
+        const verifyPlayer = async () => {
+            const { data, error } = await supabase
+                .from('players')
+                .select('id')
+                .eq('id', player.id)
+                .single();
+
+            if (error || !data) {
+                console.log('Player not found, redirecting...');
+                alert("Du har blivit borttagen från spelet.");
+                dispatch({ type: 'RESET_APP' });
+                window.location.href = '/';
+            }
+        };
+
+        verifyPlayer();
+    }, [player.id, dispatch]);
+
     // Timer logic (Sync with teacher's timer roughly)
     useEffect(() => {
         if (showAnswer || session.settings?.question_state !== 'answering' || !session.settings.timerEnabled) {

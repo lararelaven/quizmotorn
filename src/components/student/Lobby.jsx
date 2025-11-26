@@ -9,9 +9,9 @@ export default function StudentLobby({ currentPlayer, dispatch }) {
     useEffect(() => {
         if (!currentPlayer?.session_id) return;
 
-        // 1. Lyssna på om spelet startar (session update)
-        const sessionChannel = supabase
-            .channel('student_session_listener')
+        // Använd samma kanal-namn som läraren för att kunna ta emot broadcasts
+        const channel = supabase
+            .channel(`lobby_players_${currentPlayer.session_id}`)
             .on(
                 'postgres_changes',
                 {
@@ -28,13 +28,40 @@ export default function StudentLobby({ currentPlayer, dispatch }) {
                     }
                 }
             )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'DELETE',
+                    schema: 'public',
+                    table: 'players',
+                    filter: `id=eq.${currentPlayer.id}`,
+                },
+                () => {
+                    // Spelaren har blivit borttagen (via DB)
+                    alert("Du har blivit borttagen från spelet.");
+                    dispatch({ type: 'RESET_APP' });
+                    window.location.href = '/';
+                }
+            )
+            .on(
+                'broadcast',
+                { event: 'kick-player' },
+                (payload) => {
+                    // Spelaren har blivit kickad (via broadcast)
+                    if (payload.payload.playerId === currentPlayer.id) {
+                        alert("Du har blivit borttagen från spelet.");
+                        dispatch({ type: 'RESET_APP' });
+                        window.location.href = '/';
+                    }
+                }
+            )
             .subscribe((status) => {
                 console.log('Student subscription status:', status);
                 setConnectionStatus(status);
             });
 
         return () => {
-            supabase.removeChannel(sessionChannel);
+            supabase.removeChannel(channel);
         };
     }, [currentPlayer, dispatch]);
 
