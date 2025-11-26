@@ -108,7 +108,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     const fetchTopPlayers = async () => {
         const { data } = await supabase
             .from('players')
-            .select('name, score')
+            .select('id, name, score')
             .eq('session_id', session.id)
             .order('score', { ascending: false })
             .limit(3);

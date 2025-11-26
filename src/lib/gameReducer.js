@@ -198,6 +198,14 @@ export const gameReducer = (state, action) => {
                     players: [...currentPlayers, { ...action.payload, lastAnsweredQuestionIndex: -1 }]
                 }
             };
+        case 'REMOVE_PLAYER':
+            return {
+                ...state,
+                session: {
+                    ...state.session,
+                    players: state.session.players.filter(p => p.id !== action.payload)
+                }
+            };
         case 'STUDENT_START_GAME':
             return {
                 ...state,
