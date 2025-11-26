@@ -227,7 +227,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
         await supabase
             .from('sessions')
             .update({
-                currentQuestionIndex: nextIndex,
+                current_question_index: nextIndex,
                 settings: { ...session.settings, showAnswer: false, question_state: 'preview' }
             })
             .eq('id', session.id);

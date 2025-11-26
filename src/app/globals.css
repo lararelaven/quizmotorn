@@ -42,8 +42,3 @@ a {
   scrollbar-width: none;
   /* Firefox */
 }
-
-/* DEBUG: Temporary hover test */
-button:hover {
-  outline: 2px solid red !important;
-}
