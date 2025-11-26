@@ -185,39 +185,18 @@ export default function TeacherLiveGame({ session, dispatch }) {
         }
     }, [session.settings?.question_state, session.id, dispatch, session.settings]);
 
-    // --- Databas-funktioner ---
-    const handleNextQuestion = async () => {
-        setShowAnswer(false);
+    const handleShowAnswer = async () => {
+        setShowAnswer(true);
 
-        const nextIndex = session.currentQuestionIndex + 1;
-        const isLastQuestion = nextIndex >= session.quizData.questions.length;
-
-        // Bestäm nästa state baserat på om timer är aktiv
-        const nextState = session.settings.timerEnabled ? 'preview' : 'answering';
-
-        // Uppdatera lokalt direkt för snabb UI-respons
-        dispatch({ type: 'NEXT_QUESTION' });
+        // Uppdatera lokalt
         dispatch({
             type: 'UPDATE_SESSION',
             payload: {
-                settings: { ...session.settings, question_state: nextState, showAnswer: false }
+                settings: { ...session.settings, showAnswer: true, question_state: 'finished' }
             }
         });
 
         // Uppdatera DB
-        await supabase
-            .from('sessions')
-            .update({
-                current_question_index: nextIndex,
-                settings: { ...session.settings, question_state: nextState, showAnswer: false },
-                ...(isLastQuestion && { status: 'finished' })
-            })
-            .eq('id', session.id);
-    };
-
-    const handleShowAnswer = async () => {
-        setShowAnswer(true);
-        // Visa svar för elever OCH sätt status till finished så de inte kan svara mer
         await supabase
             .from('sessions')
             .update({
@@ -226,9 +205,40 @@ export default function TeacherLiveGame({ session, dispatch }) {
             .eq('id', session.id);
     };
 
+    const handleNextQuestion = async () => {
+        const nextIndex = session.currentQuestionIndex + 1;
+        setShowAnswer(false);
+
+        // Reset timer immediately if enabled
+        if (session.settings.timerEnabled) {
+            setTimeLeft(session.settings.timerDuration);
+        }
+
+        // Uppdatera lokalt
+        dispatch({
+            type: 'UPDATE_SESSION',
+            payload: {
+                currentQuestionIndex: nextIndex,
+                settings: { ...session.settings, showAnswer: false, question_state: 'preview' }
+            }
+        });
+
+        // Uppdatera DB
+        await supabase
+            .from('sessions')
+            .update({
+                currentQuestionIndex: nextIndex,
+                settings: { ...session.settings, showAnswer: false, question_state: 'preview' }
+            })
+            .eq('id', session.id);
+    };
+
     const handleCloseSession = async () => {
-        await supabase.from('sessions').update({ status: 'closed' }).eq('id', session.id);
-        if (typeof window !== 'undefined') localStorage.removeItem('teacher_session_id');
+        await supabase
+            .from('sessions')
+            .update({ status: 'finished' })
+            .eq('id', session.id);
+
         dispatch({ type: 'RESET_APP' });
         window.location.href = '/';
     };
