@@ -174,6 +174,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
     // --- Hantera Preview-fasen automatiskt via useEffect ---
     useEffect(() => {
         if (session.settings?.question_state === 'preview') {
+            // Om timer är avstängd, visa frågorna direkt (ingen "Gör dig redo"-fas)
+            const delay = session.settings.timerEnabled ? 4000 : 0;
+
             const timer = setTimeout(async () => {
                 const startTime = Date.now();
 
@@ -204,7 +207,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 // Starta timer-animationen
                 setTimeLeft(session.settings.timerDuration);
 
-            }, 4000); // 4 sekunders förberedelse
+            }, delay);
 
             return () => clearTimeout(timer);
         }
