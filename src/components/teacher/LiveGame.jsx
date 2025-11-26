@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Trophy, StopCircle, Monitor, ArrowRight, Maximize2, Loader2, CheckCircle, Users, ChevronDown, X } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 // Constants for styling (matching Student View)
 const letters = ['A', 'B', 'C', 'D'];
@@ -21,14 +22,46 @@ export default function TeacherLiveGame({ session, dispatch }) {
     const [zoomImage, setZoomImage] = useState(null);
     const [showPlayerList, setShowPlayerList] = useState(false);
 
-    // Nytt state för att räkna svar i realtid
-    const [answersCount, setAnswersCount] = useState(0);
+    // State for players and leaderboard
     const [topPlayers, setTopPlayers] = useState([]);
     const [connectedPlayers, setConnectedPlayers] = useState([]);
     const totalPlayers = connectedPlayers.length;
 
+    // Derive answers count from connected players
+    const answersCount = connectedPlayers.filter(p => p.answers && p.answers[session.currentQuestionIndex] !== undefined).length;
+
     const scrollRef = useRef(null);
     const channelRef = useRef(null);
+
+    // --- Confetti Effect on Finish ---
+    useEffect(() => {
+        if (isFinished) {
+            const duration = 3000;
+            const end = Date.now() + duration;
+
+            const frame = () => {
+                confetti({
+                    particleCount: 2,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#6366f1', '#ec4899', '#eab308']
+                });
+                confetti({
+                    particleCount: 2,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#6366f1', '#ec4899', '#eab308']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            };
+            frame();
+        }
+    }, [isFinished]);
 
     // --- Lyssna på inkommande svar OCH poänguppdateringar (för leaderboard) ---
     useEffect(() => {
@@ -37,7 +70,10 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 .from('players')
                 .select('*')
                 .eq('session_id', session.id);
-            if (data) setConnectedPlayers(data);
+            if (data) {
+                setConnectedPlayers(data);
+                fetchTopPlayers(); // Initial fetch
+            }
         };
 
         fetchPlayers();
@@ -55,6 +91,10 @@ export default function TeacherLiveGame({ session, dispatch }) {
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` }, (payload) => {
                 setConnectedPlayers((prev) => prev.map(p => p.id === payload.new.id ? payload.new : p));
+                // Update leaderboard on score/answer changes
+                setTimeout(() => {
+                    fetchTopPlayers();
+                }, 500);
             })
             .subscribe();
 
