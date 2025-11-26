@@ -16,7 +16,7 @@ export default function TeacherLogin({ dispatch }) {
         e.preventDefault();
         setErrorMsg(null);
         setInfoMsg(null);
-        
+
         if (!email || !password) {
             setErrorMsg("Fyll i både e-post och lösenord");
             return;
@@ -29,7 +29,7 @@ export default function TeacherLogin({ dispatch }) {
                 const { error } = await supabase.auth.signUp({ email, password });
                 if (error) throw error;
                 setInfoMsg("Konto skapat! Kolla din mejl för bekräftelselänk.");
-                setIsSignUp(false); 
+                setIsSignUp(false);
             } else {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
@@ -80,8 +80,8 @@ export default function TeacherLogin({ dispatch }) {
                     </div>
                 )}
 
-                <button 
-                    onClick={handleGoogleLogin} 
+                <button
+                    onClick={handleGoogleLogin}
                     disabled={loading}
                     className="w-full py-3 px-6 bg-white text-slate-900 rounded-xl flex items-center justify-center gap-3 hover:bg-indigo-50 transition-colors mb-6 font-bold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -117,10 +117,10 @@ export default function TeacherLogin({ dispatch }) {
                             disabled={loading}
                         />
                     </div>
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg hover:shadow-indigo-500/50 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:!bg-red-600 transition-all shadow-lg hover:shadow-indigo-500/50 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading && <Loader2 className="w-5 h-5 animate-spin" />}
                         {isSignUp ? 'Skapa konto' : 'Logga in'}
@@ -129,14 +129,14 @@ export default function TeacherLogin({ dispatch }) {
 
                 <div className="mt-6 text-sm text-indigo-200">
                     {isSignUp ? 'Har du redan ett konto?' : 'Har du inget konto?'}
-                    <button 
-                        onClick={() => { 
-                            setIsSignUp(!isSignUp); 
-                            setEmail(''); 
-                            setPassword(''); 
-                            setErrorMsg(null); 
+                    <button
+                        onClick={() => {
+                            setIsSignUp(!isSignUp);
+                            setEmail('');
+                            setPassword('');
+                            setErrorMsg(null);
                             setInfoMsg(null);
-                        }} 
+                        }}
                         className="ml-2 text-white font-bold hover:underline hover:text-indigo-100 transition-colors"
                         disabled={loading}
                     >
