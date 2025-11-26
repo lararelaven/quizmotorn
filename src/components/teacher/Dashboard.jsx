@@ -403,12 +403,12 @@ export default function TeacherDashboard({ state, dispatch }) {
 
             {jeopardyConfig && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
-                        <div className="bg-gradient-to-r from-orange-500 to-pink-600 p-5 flex justify-between items-center text-white">
+                    <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10 max-h-[90vh] flex flex-col">
+                        <div className="bg-gradient-to-r from-orange-500 to-pink-600 p-5 flex justify-between items-center text-white flex-shrink-0">
                             <h3 className="font-bold text-xl flex items-center gap-2"><Grid className="w-6 h-6" /> Konfigurera Jeopardy</h3>
                             <button onClick={() => setJeopardyConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
                         </div>
-                        <div className="p-8 space-y-8">
+                        <div className="p-8 space-y-8 overflow-y-auto">
                             <div>
                                 <label className="block text-sm font-bold text-slate-300 mb-3">Antal Lag: <span className="text-orange-400 text-lg ml-1">{jeopardyConfig.teams}</span></label>
                                 <input
@@ -433,12 +433,12 @@ export default function TeacherDashboard({ state, dispatch }) {
             )}
             {liveConfig && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10">
-                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 flex justify-between items-center text-white">
+                    <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10 max-h-[90vh] flex flex-col">
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 flex justify-between items-center text-white flex-shrink-0">
                             <h3 className="font-bold text-xl flex items-center gap-2"><Smartphone className="w-6 h-6" /> Konfigurera Live Quiz</h3>
                             <button onClick={() => setLiveConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
                         </div>
-                        <div className="p-8 space-y-6">
+                        <div className="p-8 space-y-6 overflow-y-auto">
                             <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/10">
                                 <div><div className="font-bold text-white">Tvinga slumpade namn</div><div className="text-xs text-slate-400 mt-1">Förhindrar olämpliga namn</div></div>
                                 <button onClick={() => setLiveConfig(p => ({ ...p, forceRandomNames: !p.forceRandomNames }))} className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.forceRandomNames ? 'bg-green-500' : 'bg-slate-600'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.forceRandomNames ? 'left-7' : 'left-1'}`} /></button>
