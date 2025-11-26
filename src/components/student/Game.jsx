@@ -170,7 +170,7 @@ export default function StudentGame({ session, player, dispatch }) {
         <div className="min-h-screen bg-slate-900 flex flex-col p-4 relative overflow-hidden">
             {/* Timer Bar (Top Center) - Only if enabled */}
             {session.settings.timerEnabled && (
-                <div className="absolute top-0 left-0 w-full h-2 bg-slate-800 z-50">
+                <div className="fixed top-0 left-0 w-full h-2 bg-slate-800 z-50">
                     <div
                         className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
                             (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'

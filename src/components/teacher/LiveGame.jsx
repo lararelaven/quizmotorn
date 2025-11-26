@@ -180,6 +180,13 @@ export default function TeacherLiveGame({ session, dispatch }) {
             .eq('id', session.id);
     };
 
+    // Auto-show answer when all players have answered
+    useEffect(() => {
+        if (totalPlayers > 0 && answersCount === totalPlayers && !showAnswer && session.settings?.question_state === 'answering') {
+            handleShowAnswer();
+        }
+    }, [answersCount, totalPlayers, showAnswer, session.settings?.question_state]);
+
     const handleKickPlayer = async (playerId) => {
         // 1. Skicka broadcast event först (så eleven vet att hen ska lämna)
         if (channelRef.current) {
