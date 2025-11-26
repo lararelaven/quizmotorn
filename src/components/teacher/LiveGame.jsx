@@ -115,6 +115,26 @@ export default function TeacherLiveGame({ session, dispatch }) {
         if (data) setTopPlayers(data);
     };
 
+    const handleShowAnswer = async () => {
+        setShowAnswer(true);
+
+        // Uppdatera lokalt
+        dispatch({
+            type: 'UPDATE_SESSION',
+            payload: {
+                settings: { ...session.settings, showAnswer: true, question_state: 'finished' }
+            }
+        });
+
+        // Uppdatera DB
+        await supabase
+            .from('sessions')
+            .update({
+                settings: { ...session.settings, showAnswer: true, question_state: 'finished' } // question_state finished stoppar svar
+            })
+            .eq('id', session.id);
+    };
+
     // --- Auto-Show Answer Logic ---
     useEffect(() => {
         if (
@@ -137,7 +157,12 @@ export default function TeacherLiveGame({ session, dispatch }) {
             return;
         }
 
-        if (timeLeft === null || timeLeft === 0) return;
+        if (timeLeft === 0) {
+            handleShowAnswer();
+            return;
+        }
+
+        if (timeLeft === null) return;
 
         const timer = setInterval(() => {
             setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
@@ -184,26 +209,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
             return () => clearTimeout(timer);
         }
     }, [session.settings?.question_state, session.id, dispatch, session.settings]);
-
-    const handleShowAnswer = async () => {
-        setShowAnswer(true);
-
-        // Uppdatera lokalt
-        dispatch({
-            type: 'UPDATE_SESSION',
-            payload: {
-                settings: { ...session.settings, showAnswer: true, question_state: 'finished' }
-            }
-        });
-
-        // Uppdatera DB
-        await supabase
-            .from('sessions')
-            .update({
-                settings: { ...session.settings, showAnswer: true, question_state: 'finished' } // question_state finished stoppar svar
-            })
-            .eq('id', session.id);
-    };
 
     const handleNextQuestion = async () => {
         const nextIndex = session.currentQuestionIndex + 1;
