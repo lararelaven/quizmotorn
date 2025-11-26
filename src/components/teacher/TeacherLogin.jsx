@@ -120,7 +120,7 @@ export default function TeacherLogin({ dispatch }) {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold debug-hover transition-all shadow-lg hover:shadow-indigo-500/50 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-500 transition-all shadow-lg hover:shadow-indigo-500/50 mt-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading && <Loader2 className="w-5 h-5 animate-spin" />}
                         {isSignUp ? 'Skapa konto' : 'Logga in'}
