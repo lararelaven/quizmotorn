@@ -314,7 +314,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     if (!question) return <div className="p-8 text-white">Laddar fråga...</div>;
 
     const isPreview = session.settings?.question_state === 'preview';
-    const questionTextSize = question.question.length > 50 ? 'text-3xl md:text-4xl' : 'text-4xl md:text-6xl';
+    const questionTextSize = 'text-[30px]';
     const isLastQuestion = session.currentQuestionIndex >= session.quizData.questions.length - 1;
 
     return (
@@ -423,7 +423,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
                 {/* Question Text */}
                 <div className="w-full max-w-5xl text-center mb-8 md:mb-12">
-                    <h2 className={`${questionTextSize} font-black text-white leading-tight drop-shadow-lg`}>
+                    <h2 className={`${questionTextSize} font-bold text-white leading-tight drop-shadow-lg`}>
                         {question.question}
                     </h2>
                 </div>
@@ -504,8 +504,8 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
                 {/* Explanation Text (Only when answer is shown) */}
                 {showAnswer && question.explanation && (
-                    <div className="fixed bottom-8 left-8 z-50 max-w-xl animate-in slide-in-from-bottom-8 duration-500">
-                        <div className="bg-slate-900/95 backdrop-blur-md border border-indigo-500/30 p-6 rounded-2xl shadow-2xl relative overflow-hidden">
+                    <div className="fixed bottom-8 left-8 z-50 max-w-4xl animate-in slide-in-from-bottom-8 duration-500">
+                        <div className="bg-slate-900/95 backdrop-blur-md border border-indigo-500/30 p-4 rounded-2xl shadow-2xl relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
                             <div className="flex items-start gap-4">
                                 <div className="p-2 bg-indigo-500/20 rounded-lg">
