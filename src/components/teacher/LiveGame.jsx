@@ -270,50 +270,69 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     if (isFinished) {
         const sortedPlayers = [...connectedPlayers].sort((a, b) => b.score - a.score);
+        const totalQuestions = session.quizData.questions.length;
+
+        // Helper to get correct answers count
+        const getCorrectCount = (player) => {
+            if (!player.answers) return 0;
+            return Object.entries(player.answers).filter(([qIdx, ansIdx]) => {
+                const q = session.quizData.questions[qIdx];
+                return q && q.correctAnswerIndex === ansIdx;
+            }).length;
+        };
+
         return (
             <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-                <div className="z-10 text-center space-y-8 max-w-4xl w-full">
-                    <Trophy className="w-24 h-24 text-yellow-500 mx-auto animate-bounce" />
-                    <h1 className="text-6xl font-black text-white mb-2 tracking-tight">Resultat</h1>
+                <div className="z-10 text-center space-y-8 max-w-5xl w-full">
+                    <Trophy className="w-24 h-24 text-yellow-500 mx-auto animate-bounce mb-8" />
 
                     {/* Top 3 Podium */}
-                    <div className="flex items-end justify-center gap-4 h-64 mb-12">
+                    <div className="flex items-end justify-center gap-4 h-96 mb-12">
                         {/* 2nd Place */}
                         {sortedPlayers[1] && (
-                            <div className="flex flex-col items-center animate-in slide-in-from-bottom-12 duration-700 delay-200">
-                                <div className="w-20 h-20 rounded-full bg-slate-300 border-4 border-slate-400 flex items-center justify-center text-3xl font-bold text-slate-800 mb-4 shadow-xl">
+                            <div className="flex flex-col items-center animate-in slide-in-from-bottom-12 duration-700 delay-200 w-1/3 max-w-[200px]">
+                                <div className="w-20 h-20 rounded-full bg-slate-300 border-4 border-slate-400 flex items-center justify-center text-3xl font-bold text-slate-800 mb-4 shadow-xl relative z-10">
                                     2
                                 </div>
-                                <div className="bg-slate-800 p-4 rounded-t-xl w-32 h-32 flex flex-col items-center justify-center border-t-4 border-slate-400">
-                                    <span className="font-bold text-white truncate w-full text-center">{sortedPlayers[1].name}</span>
-                                    <span className="font-mono text-slate-400">{sortedPlayers[1].score}p</span>
+                                <div className="bg-slate-800 p-4 rounded-t-xl w-full h-48 flex flex-col items-center justify-center border-t-4 border-slate-400 relative">
+                                    <span className="font-mono text-slate-300 text-2xl font-bold mb-2">{sortedPlayers[1].score}p</span>
+                                    <span className="text-slate-500 text-sm font-bold">{getCorrectCount(sortedPlayers[1])}/{totalQuestions} rätt</span>
+                                </div>
+                                <div className="mt-4 text-center w-full">
+                                    <span className="font-bold text-white text-xl block break-words leading-tight">{sortedPlayers[1].name}</span>
                                 </div>
                             </div>
                         )}
 
                         {/* 1st Place */}
                         {sortedPlayers[0] && (
-                            <div className="flex flex-col items-center animate-in slide-in-from-bottom-12 duration-700">
-                                <div className="w-24 h-24 rounded-full bg-yellow-400 border-4 border-yellow-500 flex items-center justify-center text-4xl font-bold text-yellow-900 mb-4 shadow-2xl relative">
+                            <div className="flex flex-col items-center animate-in slide-in-from-bottom-12 duration-700 w-1/3 max-w-[220px]">
+                                <div className="w-28 h-28 rounded-full bg-yellow-400 border-4 border-yellow-500 flex items-center justify-center text-5xl font-bold text-yellow-900 mb-4 shadow-2xl relative z-20">
                                     <Trophy className="w-12 h-12 absolute -top-10 text-yellow-400 drop-shadow-lg animate-pulse" />
                                     1
                                 </div>
-                                <div className="bg-slate-800 p-6 rounded-t-xl w-40 h-48 flex flex-col items-center justify-center border-t-4 border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.3)]">
-                                    <span className="text-xl font-black text-white truncate w-full text-center mb-1">{sortedPlayers[0].name}</span>
-                                    <span className="font-mono text-yellow-400 text-xl">{sortedPlayers[0].score}p</span>
+                                <div className="bg-slate-800 p-6 rounded-t-xl w-full h-64 flex flex-col items-center justify-center border-t-4 border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.3)] relative z-10">
+                                    <span className="font-mono text-yellow-400 text-4xl font-black mb-2">{sortedPlayers[0].score}p</span>
+                                    <span className="text-slate-400 text-lg font-bold">{getCorrectCount(sortedPlayers[0])}/{totalQuestions} rätt</span>
+                                </div>
+                                <div className="mt-4 text-center w-full">
+                                    <span className="font-black text-white text-3xl block break-words leading-tight drop-shadow-lg">{sortedPlayers[0].name}</span>
                                 </div>
                             </div>
                         )}
 
                         {/* 3rd Place */}
                         {sortedPlayers[2] && (
-                            <div className="flex flex-col items-center animate-in slide-in-from-bottom-12 duration-700 delay-400">
-                                <div className="w-20 h-20 rounded-full bg-amber-700 border-4 border-amber-800 flex items-center justify-center text-3xl font-bold text-amber-100 mb-4 shadow-xl">
+                            <div className="flex flex-col items-center animate-in slide-in-from-bottom-12 duration-700 delay-400 w-1/3 max-w-[200px]">
+                                <div className="w-20 h-20 rounded-full bg-amber-700 border-4 border-amber-800 flex items-center justify-center text-3xl font-bold text-amber-100 mb-4 shadow-xl relative z-10">
                                     3
                                 </div>
-                                <div className="bg-slate-800 p-4 rounded-t-xl w-32 h-24 flex flex-col items-center justify-center border-t-4 border-amber-700">
-                                    <span className="font-bold text-white truncate w-full text-center">{sortedPlayers[2].name}</span>
-                                    <span className="font-mono text-slate-400">{sortedPlayers[2].score}p</span>
+                                <div className="bg-slate-800 p-4 rounded-t-xl w-full h-36 flex flex-col items-center justify-center border-t-4 border-amber-700 relative">
+                                    <span className="font-mono text-amber-600 text-2xl font-bold mb-2">{sortedPlayers[2].score}p</span>
+                                    <span className="text-slate-500 text-sm font-bold">{getCorrectCount(sortedPlayers[2])}/{totalQuestions} rätt</span>
+                                </div>
+                                <div className="mt-4 text-center w-full">
+                                    <span className="font-bold text-white text-xl block break-words leading-tight">{sortedPlayers[2].name}</span>
                                 </div>
                             </div>
                         )}
