@@ -1,11 +1,12 @@
 'use client';
-import React, { useEffect, useState } from 'react';
-import { Users, Play, QrCode, Copy, ArrowLeft, Check } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Users, Play, QrCode, Copy, ArrowLeft, Check, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function TeacherLobby({ session, dispatch }) {
     const [copied, setCopied] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState('CONNECTING'); // CONNECTING, SUBSCRIBED, ERROR
+    const channelRef = useRef(null);
 
     useEffect(() => {
         if (!session?.id) return;
@@ -29,14 +30,18 @@ export default function TeacherLobby({ session, dispatch }) {
             .on(
                 'postgres_changes',
                 {
-                    event: 'INSERT',
+                    event: '*', // Listen to all events (INSERT, DELETE)
                     schema: 'public',
                     table: 'players',
                     filter: `session_id=eq.${session.id}`,
                 },
                 (payload) => {
-                    console.log('Received player insert:', payload);
-                    dispatch({ type: 'ADD_PLAYER', payload: payload.new });
+                    console.log('Received player change:', payload);
+                    if (payload.eventType === 'INSERT') {
+                        dispatch({ type: 'ADD_PLAYER', payload: payload.new });
+                    } else if (payload.eventType === 'DELETE') {
+                        dispatch({ type: 'REMOVE_PLAYER', payload: payload.old.id });
+                    }
                 }
             )
             .subscribe((status) => {
@@ -44,8 +49,11 @@ export default function TeacherLobby({ session, dispatch }) {
                 setConnectionStatus(status);
             });
 
+        channelRef.current = channel;
+
         return () => {
             supabase.removeChannel(channel);
+            channelRef.current = null;
         };
     }, [session.id, dispatch]);
 
@@ -71,6 +79,27 @@ export default function TeacherLobby({ session, dispatch }) {
                 settings: { ...session.settings, question_state: initialState }
             }
         });
+    };
+
+    const handleKickPlayer = async (playerId) => {
+        // Optimistic update
+        dispatch({ type: 'REMOVE_PLAYER', payload: playerId });
+
+        // 1. Broadcast kick event
+        if (channelRef.current) {
+            await channelRef.current.send({
+                type: 'broadcast',
+                event: 'kick-player',
+                payload: { playerId }
+            });
+        }
+
+        // 2. Delete from DB
+        const { error } = await supabase.from('players').delete().eq('id', playerId);
+        if (error) {
+            console.error("Error kicking player:", error);
+            // Optionally revert optimistic update here if needed, but usually fine to just log
+        }
     };
 
     const handleCopyLink = () => {
@@ -141,8 +170,18 @@ export default function TeacherLobby({ session, dispatch }) {
                 ) : (
                     <div className="flex flex-wrap gap-4 justify-center w-full">
                         {session.players.map((p, i) => (
-                            <div key={p.id || i} className="bg-slate-800 border-b-4 border-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-lg md:text-2xl shadow-lg animate-in fade-in zoom-in duration-300">
+                            <div key={p.id || i} className="group relative bg-slate-800 border-b-4 border-indigo-600 text-white px-6 py-3 rounded-xl font-bold text-lg md:text-2xl shadow-lg animate-in fade-in zoom-in duration-300 hover:scale-105 transition-transform">
                                 {p.name}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleKickPlayer(p.id);
+                                    }}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600"
+                                    title="Kicka spelare"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
                             </div>
                         ))}
                     </div>

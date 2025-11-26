@@ -35,60 +35,6 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
     // --- Lyssna på inkommande svar OCH poänguppdateringar (för leaderboard) ---
     useEffect(() => {
-        if (!session.id) return;
-
-        // Nollställ räknaren vid ny fråga
-        setAnswersCount(0);
-
-        // Hämta spelare initialt
-        const fetchPlayers = async () => {
-            const { data } = await supabase.from('players').select('*').eq('session_id', session.id);
-            if (data) {
-                setConnectedPlayers(data);
-                // Räkna hur många som redan svarat på denna fråga (om man laddar om sidan)
-                const answered = data.filter(p => p.answers && p.answers[session.currentQuestionIndex] !== undefined).length;
-                setAnswersCount(answered);
-            }
-        };
-        fetchPlayers();
-
-        // Use session-specific channel for isolation and broadcasting
-        const channel = supabase
-            .channel(`student_game_${session.id}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'players', filter: `session_id=eq.${session.id}` },
-                (payload) => {
-                    if (payload.eventType === 'INSERT') {
-                        setConnectedPlayers(prev => [...prev, payload.new]);
-                    } else if (payload.eventType === 'DELETE') {
-                        setConnectedPlayers(prev => prev.filter(p => p.id !== payload.old.id));
-                        fetchTopPlayers();
-                    } else if (payload.eventType === 'UPDATE') {
-                        setConnectedPlayers(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
-
-                        // Uppdatera leaderboard om poäng ändras
-                        if (payload.new.score !== payload.old.score) {
-                            fetchTopPlayers();
-                        }
-                    }
-                }
-            )
-            .subscribe();
-
-        channelRef.current = channel;
-        fetchTopPlayers(); // Hämta initialt
-
-        return () => {
-            supabase.removeChannel(channel);
-            channelRef.current = null;
-        };
-    }, [session.currentQuestionIndex, session.id]);
-
-    // Uppdatera answersCount baserat på connectedPlayers
-    useEffect(() => {
-        const count = connectedPlayers.filter(p => p.answers && p.answers[session.currentQuestionIndex] !== undefined).length;
-        setAnswersCount(count);
     }, [connectedPlayers, session.currentQuestionIndex]);
 
     const fetchTopPlayers = async () => {
@@ -182,445 +128,419 @@ export default function TeacherLiveGame({ session, dispatch }) {
     };
 
     // Auto-show answer when all players have answered
-    useEffect(() => {
-        if (totalPlayers > 0 && answersCount === totalPlayers && !showAnswer && session.settings?.question_state === 'answering') {
-            handleShowAnswer();
-        }
-    }, [answersCount, totalPlayers, showAnswer, session.settings?.question_state]);
+};
 
-    const handleKickPlayer = async (playerId) => {
-        // Optimistic update: Remove player immediately from UI
-        setConnectedPlayers(prev => prev.filter(p => p.id !== playerId));
+const handleCloseSession = async () => {
+    await supabase.from('sessions').update({ status: 'closed' }).eq('id', session.id);
+    if (typeof window !== 'undefined') localStorage.removeItem('teacher_session_id');
+    dispatch({ type: 'RESET_APP' });
+    window.location.href = '/';
+};
 
-        // 1. Skicka broadcast event först (så eleven vet att hen ska lämna)
-        if (channelRef.current) {
-            await channelRef.current.send({
-                type: 'broadcast',
-                event: 'kick-player',
-                payload: { playerId }
-            });
-        }
-
-        // 2. Ta bort från DB
-        await supabase.from('players').delete().eq('id', playerId);
-    };
-
-    const handleEndGame = async () => {
-        await supabase.from('sessions').update({ status: 'finished' }).eq('id', session.id);
-        dispatch({ type: 'END_GAME' });
-    };
-
-    const handleCloseSession = async () => {
-        await supabase.from('sessions').update({ status: 'closed' }).eq('id', session.id);
-        if (typeof window !== 'undefined') localStorage.removeItem('teacher_session_id');
-        dispatch({ type: 'RESET_APP' });
-        window.location.href = '/';
-    };
-
-    // Timer logic
-    useEffect(() => {
-        // Stoppa timer om vi visar svaret eller om frågan inte är i 'answering' fas
-        if (showAnswer || session.settings?.question_state !== 'answering' || !session.settings.timerEnabled) {
-            // Om vi precis visade svaret, behåll tiden där den är (frys den)
-            // Om vi byter fråga (showAnswer blir false), återställs den av nästa effekt
-            return;
-        }
-
-        if (timeLeft === null) return;
-
-        if (timeLeft === 0) {
-            handleShowAnswer();
-            return;
-        }
-
-        const timer = setInterval(() => {
-            setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
-        }, 1000);
-
-        return () => clearInterval(timer);
-    }, [timeLeft, session.settings?.question_state, session.settings.timerEnabled, showAnswer]);
-
-    // Reset timer when question changes (fallback)
-    useEffect(() => {
-        if (session.settings.timerEnabled && !showAnswer) {
-            setTimeLeft(session.settings.timerDuration);
-        }
-    }, [session.currentQuestionIndex, session.settings.timerEnabled, session.settings.timerDuration, showAnswer]);
-
-    useEffect(() => {
-        if (showAnswer && scrollRef.current) {
-            setTimeout(() => {
-                scrollRef.current.scrollTo({
-                    top: scrollRef.current.scrollHeight,
-                    behavior: 'smooth'
-                });
-            }, 100);
-        }
-    }, [showAnswer]);
-
-    // --- Hämta slutgiltiga poäng när spelet är slut ---
-    useEffect(() => {
-        if (isFinished) {
-            fetchTopPlayers();
-            import('canvas-confetti').then((confetti) => {
-                const duration = 3000;
-                const end = Date.now() + duration;
-
-                (function frame() {
-                    confetti.default({
-                        particleCount: 5,
-                        angle: 60,
-                        spread: 55,
-                        origin: { x: 0 },
-                        colors: ['#6366f1', '#ec4899', '#eab308']
-                    });
-                    confetti.default({
-                        particleCount: 5,
-                        angle: 120,
-                        spread: 55,
-                        origin: { x: 1 },
-                        colors: ['#6366f1', '#ec4899', '#eab308']
-                    });
-
-                    if (Date.now() < end) {
-                        requestAnimationFrame(frame);
-                    }
-                }());
-            });
-        }
-    }, [isFinished]);
-
-    if (isFinished) {
-        const sortedPlayers = [...(topPlayers.length > 0 ? topPlayers : connectedPlayers || [])]
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 3);
-
-        return (
-            <div className="flex flex-col h-screen items-center justify-center bg-slate-900 text-white p-8 overflow-hidden relative">
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 animate-pulse"></div>
-                <Trophy className="w-32 h-32 text-yellow-400 mb-8 animate-bounce drop-shadow-[0_0_35px_rgba(250,204,21,0.6)]" />
-                <h1 className="text-7xl font-black mb-16 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 drop-shadow-sm">Resultat</h1>
-
-                <div className="flex items-end justify-center gap-4 md:gap-8 w-full max-w-4xl mb-12 perspective-1000">
-                    {/* 2nd Place */}
-                    {sortedPlayers[1] && (
-                        <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
-                            <div className="mb-4 text-center">
-                                <span className="block text-2xl font-bold text-slate-300">{sortedPlayers[1].name}</span>
-                                <span className="block text-xl font-mono text-slate-400">{sortedPlayers[1].score} p</span>
-                            </div>
-                            <div className="w-24 md:w-32 h-40 bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-lg flex items-end justify-center pb-4 shadow-2xl border-t border-white/20 relative group">
-                                <span className="text-5xl font-black text-white/20 group-hover:text-white/40 transition-colors">2</span>
-                            </div>
-                        </div>
-                    )}
-                    {/* 1st Place */}
-                    {sortedPlayers[0] && (
-                        <div className="flex flex-col items-center z-10 animate-slide-up">
-                            <div className="mb-6 text-center">
-                                <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-2 animate-pulse" />
-                                <span className="block text-4xl font-black text-yellow-400 drop-shadow-md">{sortedPlayers[0].name}</span>
-                                <span className="block text-3xl font-mono text-yellow-200 font-bold">{sortedPlayers[0].score} p</span>
-                            </div>
-                            <div className="w-32 md:w-40 h-56 bg-gradient-to-t from-yellow-600 to-yellow-400 rounded-t-lg flex items-end justify-center pb-6 shadow-[0_0_50px_rgba(234,179,8,0.4)] border-t border-white/30 relative group">
-                                <span className="text-7xl font-black text-white/30 group-hover:text-white/50 transition-colors">1</span>
-                                <div className="absolute inset-0 bg-white/10 animate-pulse rounded-t-lg"></div>
-                            </div>
-                        </div>
-                    )}
-                    {/* 3rd Place */}
-                    {sortedPlayers[2] && (
-                        <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.4s' }}>
-                            <div className="mb-4 text-center">
-                                <span className="block text-2xl font-bold text-slate-300">{sortedPlayers[2].name}</span>
-                                <span className="block text-xl font-mono text-slate-400">{sortedPlayers[2].score} p</span>
-                            </div>
-                            <div className="w-24 md:w-32 h-32 bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg flex items-end justify-center pb-4 shadow-2xl border-t border-white/20 relative group">
-                                <span className="text-5xl font-black text-white/20 group-hover:text-white/40 transition-colors">3</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                <button onClick={handleCloseSession} className="relative z-[100] px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all duration-300 flex items-center gap-2 cursor-pointer">
-                    <StopCircle className="w-6 h-6" /> Avsluta Session
-                </button>
-            </div>
-        );
+// Timer logic
+useEffect(() => {
+    // Stoppa timer om vi visar svaret eller om frågan inte är i 'answering' fas
+    if (showAnswer || session.settings?.question_state !== 'answering' || !session.settings.timerEnabled) {
+        // Om vi precis visade svaret, behåll tiden där den är (frys den)
+        // Om vi byter fråga (showAnswer blir false), återställs den av nästa effekt
+        return;
     }
 
-    if (!question) return <div className="text-white text-center p-10 flex flex-col items-center gap-4"><Loader2 className="animate-spin w-10 h-10" /><span>Laddar fråga...</span></div>;
+    if (timeLeft === null) return;
 
-    const isPreview = session.settings?.question_state === 'preview';
+    if (timeLeft === 0) {
+        handleShowAnswer();
+        return;
+    }
 
-    // Dynamic font size for long questions
-    const questionTextSize = question.question.length > 60 ? 'text-[24px]' : 'text-[30px]';
+    const timer = setInterval(() => {
+        setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
 
-    // Check if this is the last question
-    const isLastQuestion = session.currentQuestionIndex >= session.quizData.questions.length - 1;
+    return () => clearInterval(timer);
+}, [timeLeft, session.settings?.question_state, session.settings.timerEnabled, showAnswer]);
+
+// Reset timer when question changes (fallback)
+useEffect(() => {
+    if (session.settings.timerEnabled && !showAnswer) {
+        setTimeLeft(session.settings.timerDuration);
+    }
+}, [session.currentQuestionIndex, session.settings.timerEnabled, session.settings.timerDuration, showAnswer]);
+
+useEffect(() => {
+    if (showAnswer && scrollRef.current) {
+        setTimeout(() => {
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }, 100);
+    }
+}, [showAnswer]);
+
+// --- Hämta slutgiltiga poäng när spelet är slut ---
+useEffect(() => {
+    if (isFinished) {
+        fetchTopPlayers();
+        import('canvas-confetti').then((confetti) => {
+            const duration = 3000;
+            const end = Date.now() + duration;
+
+            (function frame() {
+                confetti.default({
+                    particleCount: 5,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 },
+                    colors: ['#6366f1', '#ec4899', '#eab308']
+                });
+                confetti.default({
+                    particleCount: 5,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 },
+                    colors: ['#6366f1', '#ec4899', '#eab308']
+                });
+
+                if (Date.now() < end) {
+                    requestAnimationFrame(frame);
+                }
+            }());
+        });
+    }
+}, [isFinished]);
+
+if (isFinished) {
+    const sortedPlayers = [...(topPlayers.length > 0 ? topPlayers : connectedPlayers || [])]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
 
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
+        <div className="flex flex-col h-screen items-center justify-center bg-slate-900 text-white p-8 overflow-hidden relative">
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 animate-pulse"></div>
+            <Trophy className="w-32 h-32 text-yellow-400 mb-8 animate-bounce drop-shadow-[0_0_35px_rgba(250,204,21,0.6)]" />
+            <h1 className="text-7xl font-black mb-16 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 drop-shadow-sm">Resultat</h1>
 
-            {/* Timer Bar (Top Center) - Only if enabled - NOW OVER EVERYTHING */}
-            {session.settings.timerEnabled && (
-                <div className="fixed top-0 left-0 w-full h-2 bg-slate-800 z-50">
-                    <div
-                        className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
-                            (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
-                            }`}
-                        style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
-                    />
-                </div>
-            )}
-
-            {/* Header - Transparent & No Border */}
-            <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-40 pointer-events-none mt-4">
-                {/* Left: Question Counter */}
-                <div className="bg-black/20 backdrop-blur-md px-4 py-2 rounded-lg font-mono font-bold text-white/80 border border-white/10 pointer-events-auto">
-                    FRÅGA {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
-                </div>
-
-                {/* Center: Leaderboard (Top 3) */}
-                <div className="flex gap-2 pointer-events-auto">
-                    {topPlayers.slice(0, 3).map((p, i) => (
-                        <div key={p.id} className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 animate-in fade-in slide-in-from-top-4 duration-500" style={{ animationDelay: `${i * 100}ms` }}>
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-slate-400 text-black' : 'bg-amber-700 text-white'}`}>
-                                {i + 1}
-                            </div>
-                            <span className="text-xs font-bold text-white max-w-[80px] truncate">{p.name}</span>
-                            <span className="text-xs font-mono text-indigo-300">{p.score}</span>
+            <div className="flex items-end justify-center gap-4 md:gap-8 w-full max-w-4xl mb-12 perspective-1000">
+                {/* 2nd Place */}
+                {sortedPlayers[1] && (
+                    <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                        <div className="mb-4 text-center">
+                            <span className="block text-2xl font-bold text-slate-300">{sortedPlayers[1].name}</span>
+                            <span className="block text-xl font-mono text-slate-400">{sortedPlayers[1].score} p</span>
                         </div>
-                    ))}
-                </div>
-
-                {/* Right: Answer Count & Controls */}
-                <div className="flex items-center gap-4 pointer-events-auto">
-                    <div className="relative">
-                        <button
-                            onClick={() => setShowPlayerList(!showPlayerList)}
-                            className="flex items-center gap-2 bg-slate-950/50 px-4 py-2 rounded-lg border border-white/5 hover:bg-slate-900 transition-colors backdrop-blur-md"
-                        >
-                            <Users className="w-5 h-5 text-indigo-400" />
-                            <span className="font-bold text-white">{answersCount}</span>
-                            <span className="text-slate-400 text-sm">/ {totalPlayers} svar</span>
-                            <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showPlayerList ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {/* Player Dropdown */}
-                        {showPlayerList && (
-                            <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto">
-                                <div className="p-3 border-b border-white/5 bg-slate-900/50">
-                                    <h3 className="text-sm font-bold text-slate-300">Deltagare</h3>
-                                </div>
-                                <div className="max-h-64 overflow-y-auto p-2 space-y-1">
-                                    {connectedPlayers.map(p => {
-                                        const hasAnswered = p.answers && p.answers[session.currentQuestionIndex] !== undefined;
-                                        return (
-                                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 group">
-                                                <div className="flex items-center gap-3">
-                                                    {hasAnswered ? (
-                                                        <CheckCircle className="w-4 h-4 text-green-400" />
-                                                    ) : (
-                                                        <div className="w-4 h-4 rounded-full border-2 border-slate-600" />
-                                                    )}
-                                                    <span className="text-sm font-medium text-white">{p.name}</span>
-                                                </div>
-                                                <button
-                                                    onMouseDown={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleKickPlayer(p.id);
-                                                    }}
-                                                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer z-50"
-                                                    title="Ta bort spelare"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                    {connectedPlayers.length === 0 && (
-                                        <div className="p-4 text-center text-slate-500 text-sm">
-                                            Inga deltagare än
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <button
-                        onClick={() => setShowExitConfirm(true)}
-                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-2 rounded-lg border border-red-500/20 transition-colors"
-                        title="Avsluta session"
-                    >
-                        <StopCircle className="w-5 h-5" />
-                    </button>
-                </div>
-            </div>
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative z-10">
-
-                {/* Question Text */}
-                <div className="w-full max-w-5xl text-center mb-8 md:mb-12">
-                    <h2 className={`${questionTextSize} font-black text-white leading-tight drop-shadow-lg`}>
-                        {question.question}
-                    </h2>
-                </div>
-
-                {/* Image (if exists) */}
-                {question.image && (
-                    <div className="mb-8 relative group cursor-zoom-in" onClick={() => setZoomImage(question.image)}>
-                        <img
-                            src={question.image}
-                            alt="Question"
-                            className="max-h-[30vh] rounded-2xl shadow-2xl border-4 border-white/10 group-hover:scale-[1.02] transition-transform duration-300"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 rounded-2xl">
-                            <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
+                        <div className="w-24 md:w-32 h-40 bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-lg flex items-end justify-center pb-4 shadow-2xl border-t border-white/20 relative group">
+                            <span className="text-5xl font-black text-white/20 group-hover:text-white/40 transition-colors">2</span>
                         </div>
                     </div>
                 )}
-
-                {/* Content Switch: Preview vs Options */}
-                {isPreview ? (
-                    <div className="flex flex-col items-center justify-center py-12 animate-in zoom-in duration-300">
-                        <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(79,70,229,0.5)] animate-pulse">
-                            <Loader2 className="w-12 h-12 text-white animate-spin" />
+                {/* 1st Place */}
+                {sortedPlayers[0] && (
+                    <div className="flex flex-col items-center z-10 animate-slide-up">
+                        <div className="mb-6 text-center">
+                            <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-2 animate-pulse" />
+                            <span className="block text-4xl font-black text-yellow-400 drop-shadow-md">{sortedPlayers[0].name}</span>
+                            <span className="block text-3xl font-mono text-yellow-200 font-bold">{sortedPlayers[0].score} p</span>
                         </div>
-                        <h3 className="text-4xl font-black text-white mb-2">Gör dig redo!</h3>
-                        <p className="text-xl text-indigo-300">Svarsalternativen kommer snart...</p>
+                        <div className="w-32 md:w-40 h-56 bg-gradient-to-t from-yellow-600 to-yellow-400 rounded-t-lg flex items-end justify-center pb-6 shadow-[0_0_50px_rgba(234,179,8,0.4)] border-t border-white/30 relative group">
+                            <span className="text-7xl font-black text-white/30 group-hover:text-white/50 transition-colors">1</span>
+                            <div className="absolute inset-0 bg-white/10 animate-pulse rounded-t-lg"></div>
+                        </div>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl animate-in fade-in slide-in-from-bottom-8 duration-500">
-                        {question.options.map((opt, idx) => {
-                            const isCorrect = idx === question.correctAnswerIndex;
-                            const showResult = showAnswer;
+                )}
+                {/* 3rd Place */}
+                {sortedPlayers[2] && (
+                    <div className="flex flex-col items-center animate-slide-up" style={{ animationDelay: '0.4s' }}>
+                        <div className="mb-4 text-center">
+                            <span className="block text-2xl font-bold text-slate-300">{sortedPlayers[2].name}</span>
+                            <span className="block text-xl font-mono text-slate-400">{sortedPlayers[2].score} p</span>
+                        </div>
+                        <div className="w-24 md:w-32 h-32 bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg flex items-end justify-center pb-4 shadow-2xl border-t border-white/20 relative group">
+                            <span className="text-5xl font-black text-white/20 group-hover:text-white/40 transition-colors">3</span>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <button onClick={handleCloseSession} className="relative z-[100] px-10 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all duration-300 flex items-center gap-2 cursor-pointer">
+                <StopCircle className="w-6 h-6" /> Avsluta Session
+            </button>
+        </div>
+    );
+}
 
-                            // Teacher View Styling (Letter + Dark BG + Colored Border)
-                            let containerClass = `
+if (!question) return <div className="text-white text-center p-10 flex flex-col items-center gap-4"><Loader2 className="animate-spin w-10 h-10" /><span>Laddar fråga...</span></div>;
+
+const isPreview = session.settings?.question_state === 'preview';
+
+// Dynamic font size for long questions
+const questionTextSize = question.question.length > 60 ? 'text-[24px]' : 'text-[30px]';
+
+// Check if this is the last question
+const isLastQuestion = session.currentQuestionIndex >= session.quizData.questions.length - 1;
+
+return (
+    <div className="min-h-screen bg-slate-900 flex flex-col relative overflow-hidden">
+
+        {/* Timer Bar (Top Center) - Only if enabled - NOW OVER EVERYTHING */}
+        {session.settings.timerEnabled && (
+            <div className="fixed top-0 left-0 w-full h-2 bg-slate-800 z-50">
+                <div
+                    className={`h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] ${session.settings.question_state === 'answering' && !showAnswer ? 'transition-all duration-1000 ease-linear' : 'transition-none'} ${(timeLeft / session.settings.timerDuration) > 0.5 ? 'bg-green-500' :
+                        (timeLeft / session.settings.timerDuration) > 0.2 ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
+                        }`}
+                    style={{ width: `${(timeLeft / session.settings.timerDuration) * 100}%` }}
+                />
+            </div>
+        )}
+
+        {/* Header - Transparent & No Border */}
+        <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-start z-40 pointer-events-none mt-4">
+            {/* Left: Question Counter */}
+            <div className="bg-black/20 backdrop-blur-md px-4 py-2 rounded-lg font-mono font-bold text-white/80 border border-white/10 pointer-events-auto">
+                FRÅGA {session.currentQuestionIndex + 1} / {session.quizData.questions.length}
+            </div>
+
+            {/* Center: Leaderboard (Top 3) */}
+            <div className="flex gap-2 pointer-events-auto">
+                {topPlayers.slice(0, 3).map((p, i) => (
+                    <div key={p.id} className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 animate-in fade-in slide-in-from-top-4 duration-500" style={{ animationDelay: `${i * 100}ms` }}>
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-yellow-500 text-black' : i === 1 ? 'bg-slate-400 text-black' : 'bg-amber-700 text-white'}`}>
+                            {i + 1}
+                        </div>
+                        <span className="text-xs font-bold text-white max-w-[80px] truncate">{p.name}</span>
+                        <span className="text-xs font-mono text-indigo-300">{p.score}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Right: Answer Count & Controls */}
+            <div className="flex items-center gap-4 pointer-events-auto">
+                <div className="relative">
+                    <button
+                        onClick={() => setShowPlayerList(!showPlayerList)}
+                        className="flex items-center gap-2 bg-slate-950/50 px-4 py-2 rounded-lg border border-white/5 hover:bg-slate-900 transition-colors backdrop-blur-md"
+                    >
+                        <Users className="w-5 h-5 text-indigo-400" />
+                        <span className="font-bold text-white">{answersCount}</span>
+                        <span className="text-slate-400 text-sm">/ {totalPlayers} svar</span>
+                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${showPlayerList ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Player Dropdown */}
+                    {showPlayerList && (
+                        <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto">
+                            <div className="p-3 border-b border-white/5 bg-slate-900/50">
+                                <h3 className="text-sm font-bold text-slate-300">Deltagare</h3>
+                            </div>
+                            <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                                {connectedPlayers.map(p => {
+                                    const hasAnswered = p.answers && p.answers[session.currentQuestionIndex] !== undefined;
+                                    return (
+                                        <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 group">
+                                            <div className="flex items-center gap-3">
+                                                {hasAnswered ? (
+                                                    <CheckCircle className="w-4 h-4 text-green-400" />
+                                                ) : (
+                                                    <div className="w-4 h-4 rounded-full border-2 border-slate-600" />
+                                                )}
+                                                <span className="text-sm font-medium text-white">{p.name}</span>
+                                            </div>
+                                            <button
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleKickPlayer(p.id);
+                                                }}
+                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors cursor-pointer z-50"
+                                                title="Ta bort spelare"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                                {connectedPlayers.length === 0 && (
+                                    <div className="p-4 text-center text-slate-500 text-sm">
+                                        Inga deltagare än
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <button
+                    onClick={() => setShowExitConfirm(true)}
+                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 p-2 rounded-lg border border-red-500/20 transition-colors"
+                    title="Avsluta session"
+                >
+                    <StopCircle className="w-5 h-5" />
+                </button>
+            </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative z-10">
+
+            {/* Question Text */}
+            <div className="w-full max-w-5xl text-center mb-8 md:mb-12">
+                <h2 className={`${questionTextSize} font-black text-white leading-tight drop-shadow-lg`}>
+                    {question.question}
+                </h2>
+            </div>
+
+            {/* Image (if exists) */}
+            {question.image && (
+                <div className="mb-8 relative group cursor-zoom-in" onClick={() => setZoomImage(question.image)}>
+                    <img
+                        src={question.image}
+                        alt="Question"
+                        className="max-h-[30vh] rounded-2xl shadow-2xl border-4 border-white/10 group-hover:scale-[1.02] transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30 rounded-2xl">
+                        <Maximize2 className="w-8 h-8 text-white drop-shadow-lg" />
+                    </div>
+                </div>
+            )}
+
+            {/* Content Switch: Preview vs Options */}
+            {isPreview ? (
+                <div className="flex flex-col items-center justify-center py-12 animate-in zoom-in duration-300">
+                    <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(79,70,229,0.5)] animate-pulse">
+                        <Loader2 className="w-12 h-12 text-white animate-spin" />
+                    </div>
+                    <h3 className="text-4xl font-black text-white mb-2">Gör dig redo!</h3>
+                    <p className="text-xl text-indigo-300">Svarsalternativen kommer snart...</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl animate-in fade-in slide-in-from-bottom-8 duration-500">
+                    {question.options.map((opt, idx) => {
+                        const isCorrect = idx === question.correctAnswerIndex;
+                        const showResult = showAnswer;
+
+                        // Teacher View Styling (Letter + Dark BG + Colored Border)
+                        let containerClass = `
                                 relative overflow-hidden rounded-2xl p-1 transition-all duration-300
                                 bg-gradient-to-br ${gradients[idx % 4]}
                                 shadow-lg
                             `;
 
-                            let contentClass = "bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-6 flex items-center gap-6 relative z-10";
-                            let opacityClass = "opacity-100";
+                        let contentClass = "bg-slate-900/90 backdrop-blur-sm h-full w-full rounded-xl p-6 flex items-center gap-6 relative z-10";
+                        let opacityClass = "opacity-100";
 
-                            if (showResult) {
-                                if (isCorrect) {
-                                    containerClass += " ring-4 ring-green-400/50 scale-[1.02] z-10";
-                                } else {
-                                    opacityClass = "opacity-50 grayscale";
-                                }
+                        if (showResult) {
+                            if (isCorrect) {
+                                containerClass += " ring-4 ring-green-400/50 scale-[1.02] z-10";
+                            } else {
+                                opacityClass = "opacity-50 grayscale";
                             }
+                        }
 
-                            return (
-                                <div key={idx} className={`${containerClass} ${opacityClass}`}>
-                                    <div className={contentClass}>
-                                        {/* Letter Circle */}
-                                        <div className={`
+                        return (
+                            <div key={idx} className={`${containerClass} ${opacityClass}`}>
+                                <div className={contentClass}>
+                                    {/* Letter Circle */}
+                                    <div className={`
                                             w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center text-2xl font-black text-white shadow-lg
                                             bg-gradient-to-br ${gradients[idx % 4]}
                                         `}>
-                                            {letters[idx]}
-                                        </div>
-
-                                        {/* Option Text */}
-                                        <span className="text-2xl font-bold text-white leading-tight">{opt}</span>
-
-                                        {/* Result Icons */}
-                                        {showResult && isCorrect && (
-                                            <CheckCircle className="w-8 h-8 text-green-400 ml-auto animate-bounce" />
-                                        )}
+                                        {letters[idx]}
                                     </div>
-                                    {/* Border gradient background */}
-                                    <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
+
+                                    {/* Option Text */}
+                                    <span className="text-2xl font-bold text-white leading-tight">{opt}</span>
+
+                                    {/* Result Icons */}
+                                    {showResult && isCorrect && (
+                                        <CheckCircle className="w-8 h-8 text-green-400 ml-auto animate-bounce" />
+                                    )}
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Controls (Next / Show Answer) */}
-                {!isPreview && (
-                    <div className="mt-12 flex justify-center gap-4 relative z-50">
-                        {!showAnswer ? (
-                            <button
-                                onClick={handleShowAnswer}
-                                className="px-12 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.3)] flex items-center gap-3"
-                            >
-                                <Monitor className="w-6 h-6" /> Visa Svar
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleNextQuestion}
-                                className="px-12 py-4 bg-indigo-600 text-white rounded-full font-black text-xl hover:bg-indigo-500 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(79,70,229,0.5)] flex items-center gap-3"
-                            >
-                                {isLastQuestion ? (
-                                    <>
-                                        <Trophy className="w-6 h-6" /> Avsluta Spel
-                                    </>
-                                ) : (
-                                    <>
-                                        Nästa Fråga <ArrowRight className="w-6 h-6" />
-                                    </>
-                                )}
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Exit Confirmation Modal */}
-                {showExitConfirm && (
-                    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                        <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                                    <StopCircle className="w-6 h-6 text-red-400" />
-                                </div>
-                                <button
-                                    onClick={() => setShowExitConfirm(false)}
-                                    className="text-slate-400 hover:text-white transition-colors"
-                                >
-                                    <X className="w-6 h-6" />
-                                </button>
+                                {/* Border gradient background */}
+                                <div className={`absolute inset-0 bg-gradient-to-r ${gradients[idx % 4]} opacity-20`} />
                             </div>
+                        );
+                    })}
+                </div>
+            )}
 
-                            <h3 className="text-2xl font-black text-white mb-4">Avsluta sessionen?</h3>
-                            <p className="text-slate-300 mb-8">
-                                Detta kommer att avsluta spelet för alla deltagare. Är du säker?
-                            </p>
+            {/* Controls (Next / Show Answer) */}
+            {!isPreview && (
+                <div className="mt-12 flex justify-center gap-4 relative z-50">
+                    {!showAnswer ? (
+                        <button
+                            onClick={handleShowAnswer}
+                            className="px-12 py-4 bg-white text-slate-900 rounded-full font-black text-xl hover:bg-indigo-50 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.3)] flex items-center gap-3"
+                        >
+                            <Monitor className="w-6 h-6" /> Visa Svar
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleNextQuestion}
+                            className="px-12 py-4 bg-indigo-600 text-white rounded-full font-black text-xl hover:bg-indigo-500 hover:scale-105 transition-all duration-300 shadow-[0_0_30px_rgba(79,70,229,0.5)] flex items-center gap-3"
+                        >
+                            {isLastQuestion ? (
+                                <>
+                                    <Trophy className="w-6 h-6" /> Avsluta Spel
+                                </>
+                            ) : (
+                                <>
+                                    Nästa Fråga <ArrowRight className="w-6 h-6" />
+                                </>
+                            )}
+                        </button>
+                    )}
+                </div>
+            )}
 
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => {
-                                        setShowExitConfirm(false);
-                                        handleEndGame();
-                                    }}
-                                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-all"
-                                >
-                                    Resultat
-                                </button>
-                                <button
-                                    onClick={handleCloseSession}
-                                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all"
-                                >
-                                    Stäng
-                                </button>
+            {/* Exit Confirmation Modal */}
+            {showExitConfirm && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-slate-800 border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl scale-100 animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-start mb-6">
+                            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                                <StopCircle className="w-6 h-6 text-red-400" />
                             </div>
+                            <button
+                                onClick={() => setShowExitConfirm(false)}
+                                className="text-slate-400 hover:text-white transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <h3 className="text-2xl font-black text-white mb-4">Avsluta sessionen?</h3>
+                        <p className="text-slate-300 mb-8">
+                            Detta kommer att avsluta spelet för alla deltagare. Är du säker?
+                        </p>
+
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => {
+                                    setShowExitConfirm(false);
+                                    handleEndGame();
+                                }}
+                                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg transition-all"
+                            >
+                                Resultat
+                            </button>
+                            <button
+                                onClick={handleCloseSession}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold shadow-lg hover:shadow-red-500/30 transition-all"
+                            >
+                                Stäng
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {/* Image Zoom Modal */}
-                {zoomImage && (
-                    <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomImage(null)}>
-                        <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in duration-300" />
-                    </div>
-                )}
-            </div>
+            {/* Image Zoom Modal */}
+            {zoomImage && (
+                <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomImage(null)}>
+                    <img src={zoomImage} alt="Zoomed" className="max-w-full max-h-full rounded-lg shadow-2xl animate-in zoom-in duration-300" />
+                </div>
+            )}
         </div>
-    );
+
+        );
 }
