@@ -115,6 +115,18 @@ export default function TeacherLiveGame({ session, dispatch }) {
         if (data) setTopPlayers(data);
     };
 
+    // --- Auto-Show Answer Logic ---
+    useEffect(() => {
+        if (
+            session.settings?.question_state === 'answering' &&
+            totalPlayers > 0 &&
+            answersCount === totalPlayers &&
+            !showAnswer
+        ) {
+            handleShowAnswer();
+        }
+    }, [answersCount, totalPlayers, session.settings?.question_state, showAnswer]);
+
     // --- Hantera Preview-fasen automatiskt via useEffect ---
     useEffect(() => {
         if (session.settings?.question_state === 'preview') {
