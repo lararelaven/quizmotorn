@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Trophy, StopCircle, Monitor, ArrowRight, Maximize2, Loader2, CheckCircle, Users, ChevronDown, X } from 'lucide-react';
+import { Trophy, StopCircle, Monitor, ArrowRight, Maximize2, Loader2, CheckCircle, Users, ChevronDown, X, Info } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 // Constants for styling (matching Student View)
@@ -502,9 +502,27 @@ export default function TeacherLiveGame({ session, dispatch }) {
                     </div>
                 )}
 
-                {/* Controls (Next / Show Answer) */}
+                {/* Explanation Text (Only when answer is shown) */}
+                {showAnswer && question.explanation && (
+                    <div className="fixed bottom-8 left-8 z-50 max-w-xl animate-in slide-in-from-bottom-8 duration-500">
+                        <div className="bg-slate-900/95 backdrop-blur-md border border-indigo-500/30 p-6 rounded-2xl shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
+                            <div className="flex items-start gap-4">
+                                <div className="p-2 bg-indigo-500/20 rounded-lg">
+                                    <Info className="w-6 h-6 text-indigo-400" />
+                                </div>
+                                <div>
+                                    <h4 className="text-indigo-400 font-bold mb-1 uppercase tracking-wider text-sm">Förklaring</h4>
+                                    <p className="text-white text-lg leading-relaxed">{question.explanation}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Controls (Next / Show Answer) - FIXED BOTTOM RIGHT */}
                 {!isPreview && (
-                    <div className="mt-12 flex justify-center gap-4 relative z-50">
+                    <div className="fixed bottom-8 right-8 z-50 flex gap-4">
                         {!showAnswer ? (
                             <button
                                 onClick={handleShowAnswer}
