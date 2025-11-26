@@ -63,6 +63,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                         setConnectedPlayers(prev => [...prev, payload.new]);
                     } else if (payload.eventType === 'DELETE') {
                         setConnectedPlayers(prev => prev.filter(p => p.id !== payload.old.id));
+                        fetchTopPlayers();
                     } else if (payload.eventType === 'UPDATE') {
                         setConnectedPlayers(prev => prev.map(p => p.id === payload.new.id ? payload.new : p));
 

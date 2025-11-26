@@ -438,7 +438,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                             <h3 className="font-bold text-xl flex items-center gap-2"><Smartphone className="w-6 h-6" /> Konfigurera Live Quiz</h3>
                             <button onClick={() => setLiveConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
                         </div>
-                        <div className="p-8 space-y-6 overflow-y-auto">
+                        <div className="p-8 space-y-6 overflow-y-auto no-scrollbar">
                             <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/10">
                                 <div><div className="font-bold text-white">Tvinga slumpade namn</div><div className="text-xs text-slate-400 mt-1">Förhindrar olämpliga namn</div></div>
                                 <button onClick={() => setLiveConfig(p => ({ ...p, forceRandomNames: !p.forceRandomNames }))} className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.forceRandomNames ? 'bg-green-500' : 'bg-slate-600'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.forceRandomNames ? 'left-7' : 'left-1'}`} /></button>
