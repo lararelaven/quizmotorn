@@ -31,6 +31,7 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [currentPromptText, setCurrentPromptText] = useState(AI_PROMPT_TEXT);
     const [showTemplateManager, setShowTemplateManager] = useState(false);
     const [draggedItem, setDraggedItem] = useState(null);
+    const [editingTemplateId, setEditingTemplateId] = useState(null);
 
     useEffect(() => {
         const saved = localStorage.getItem('quiz_templates');
@@ -184,12 +185,13 @@ export default function TeacherDashboard({ state, dispatch }) {
 
         if (!template) return;
 
-        if (templateId === "Party") {
+        let promptText = template.prompt;
+        if (typeof promptText === 'string' && promptText.includes('{{TOPIC}}')) {
             const randomTopic = PARTY_TOPICS[Math.floor(Math.random() * PARTY_TOPICS.length)];
-            setCurrentPromptText(template.prompt(randomTopic));
-        } else {
-            setCurrentPromptText(template.prompt);
+            promptText = promptText.replace('{{TOPIC}}', randomTopic);
         }
+
+        setCurrentPromptText(promptText);
     };
 
     const handleResetTemplates = () => {
@@ -554,28 +556,61 @@ export default function TeacherDashboard({ state, dispatch }) {
                                 <button onClick={handleResetTemplates} className="text-xs text-red-400 hover:text-red-300 underline cursor-pointer">Återställ till standard</button>
                             </div>
 
-                            {/* Add New Template Form */}
+                            {/* Add/Edit Template Form */}
                             <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3">
-                                <h4 className="font-bold text-white text-sm">Lägg till / Redigera</h4>
+                                <div className="flex justify-between items-center">
+                                    <h4 className="font-bold text-white text-sm">{editingTemplateId ? 'Redigera Mall' : 'Lägg till Ny Mall'}</h4>
+                                    {editingTemplateId && (
+                                        <button
+                                            onClick={() => setEditingTemplateId(null)}
+                                            className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                                        >
+                                            Avbryt
+                                        </button>
+                                    )}
+                                </div>
                                 <form onSubmit={(e) => {
                                     e.preventDefault();
                                     const formData = new FormData(e.target);
-                                    const key = formData.get('label');
-                                    if (key) {
-                                        handleSaveTemplate(key, {
-                                            label: key,
+                                    const label = formData.get('label');
+                                    // If editing, use existing ID, otherwise label is ID
+                                    const id = editingTemplateId || label;
+
+                                    if (id) {
+                                        handleSaveTemplate(id, {
+                                            label: label,
                                             description: formData.get('description'),
                                             prompt: formData.get('prompt')
                                         });
                                         e.target.reset();
+                                        setEditingTemplateId(null);
                                     }
                                 }} className="space-y-3">
                                     <div className="grid grid-cols-2 gap-3">
-                                        <input name="label" placeholder="Namn (t.ex. Matte)" required className="p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm" />
-                                        <input name="description" placeholder="Beskrivning" className="p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm" />
+                                        <input
+                                            name="label"
+                                            placeholder="Namn (t.ex. Matte)"
+                                            required
+                                            className="p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm"
+                                            defaultValue={editingTemplateId ? templates.find(t => t.id === editingTemplateId)?.label : ''}
+                                        />
+                                        <input
+                                            name="description"
+                                            placeholder="Beskrivning"
+                                            className="p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm"
+                                            defaultValue={editingTemplateId ? templates.find(t => t.id === editingTemplateId)?.description : ''}
+                                        />
                                     </div>
-                                    <textarea name="prompt" placeholder="Prompt text..." required className="w-full h-24 p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm font-mono resize-none" />
-                                    <button type="submit" className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm cursor-pointer">Spara Mall</button>
+                                    <textarea
+                                        name="prompt"
+                                        placeholder="Prompt text..."
+                                        required
+                                        className="w-full h-24 p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm font-mono resize-none"
+                                        defaultValue={editingTemplateId ? templates.find(t => t.id === editingTemplateId)?.prompt : ''}
+                                    />
+                                    <button type="submit" className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm cursor-pointer">
+                                        {editingTemplateId ? 'Spara Ändringar' : 'Spara Ny Mall'}
+                                    </button>
                                 </form>
                             </div>
 
@@ -589,14 +624,17 @@ export default function TeacherDashboard({ state, dispatch }) {
                                         onDragStart={(e) => handleDragStart(e, idx)}
                                         onDragOver={(e) => handleDragOver(e, idx)}
                                         onDragEnd={handleDragEnd}
-                                        className="flex items-start justify-between bg-white/5 p-3 rounded-xl border border-white/5 hover:bg-white/10 transition-colors cursor-move active:cursor-grabbing"
+                                        className={`flex items-start justify-between bg-white/5 p-3 rounded-xl border transition-colors cursor-move active:cursor-grabbing ${editingTemplateId === tpl.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/5 hover:bg-white/10'}`}
                                     >
                                         <div>
                                             <div className="font-bold text-white text-sm">{tpl.label}</div>
                                             <div className="text-xs text-slate-400">{tpl.description}</div>
                                             <div className="text-[10px] text-slate-500 font-mono mt-1 truncate max-w-md">{typeof tpl.prompt === 'string' ? tpl.prompt : '(Funktion)'}</div>
                                         </div>
-                                        <button onClick={() => handleDeleteTemplate(tpl.id)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer" title="Ta bort"><Trash2 className="w-4 h-4" /></button>
+                                        <div className="flex gap-1">
+                                            <button onClick={() => setEditingTemplateId(tpl.id)} className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors cursor-pointer" title="Redigera"><Edit2 className="w-4 h-4" /></button>
+                                            <button onClick={() => handleDeleteTemplate(tpl.id)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer" title="Ta bort"><Trash2 className="w-4 h-4" /></button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

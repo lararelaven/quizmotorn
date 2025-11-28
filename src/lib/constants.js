@@ -84,7 +84,7 @@ export const PROMPT_TEMPLATES = {
     "Party": {
         label: "Party",
         description: "Slumpat ämne för fest",
-        prompt: (topic) => `${BASE_INTRO} Skapa frågor om ämnet: ${topic}. ${JSON_STRUCTURE}`
+        prompt: `Agera som en expertlärare på gymnasienivå. Skapa ett JSON-objekt för ett quiz med 12 frågor. Skapa frågor om ämnet: {{TOPIC}}. Strukturen måste vara strikt enligt följande format: {"title": "Titel", "questions": [{"question": "Fråga?", "options": ["Alt 1", "Alt 2", "Alt 3", "Alt 4"], "correctAnswerIndex": 0, "explanation": "Kort förklaring"}]}. Svara med endast JSON-objektet. Inget annat.`
     }
 };
 
