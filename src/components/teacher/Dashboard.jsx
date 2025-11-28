@@ -21,8 +21,22 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [quizToDelete, setQuizToDelete] = useState(null);
 
     // Prompt Template State
+    const [templates, setTemplates] = useState(PROMPT_TEMPLATES);
     const [selectedPromptTemplate, setSelectedPromptTemplate] = useState("Standard");
     const [currentPromptText, setCurrentPromptText] = useState(AI_PROMPT_TEXT);
+    const [showTemplateManager, setShowTemplateManager] = useState(false);
+
+    useEffect(() => {
+        const saved = localStorage.getItem('quiz_templates');
+        if (saved) {
+            setTemplates(JSON.parse(saved));
+        }
+    }, []);
+
+    const updateTemplates = (newTemplates) => {
+        setTemplates(newTemplates);
+        localStorage.setItem('quiz_templates', JSON.stringify(newTemplates));
+    };
 
     const [startingSession, setStartingSession] = useState(false);
 
@@ -136,7 +150,7 @@ export default function TeacherDashboard({ state, dispatch }) {
 
     const handlePromptTemplateChange = (templateKey) => {
         setSelectedPromptTemplate(templateKey);
-        const template = PROMPT_TEMPLATES[templateKey];
+        const template = templates[templateKey];
 
         if (templateKey === "Party") {
             const randomTopic = PARTY_TOPICS[Math.floor(Math.random() * PARTY_TOPICS.length)];
@@ -144,6 +158,26 @@ export default function TeacherDashboard({ state, dispatch }) {
         } else {
             setCurrentPromptText(template.prompt);
         }
+    };
+
+    const handleResetTemplates = () => {
+        if (confirm("Är du säker på att du vill återställa alla mallar till standard?")) {
+            updateTemplates(PROMPT_TEMPLATES);
+            setShowTemplateManager(false);
+        }
+    };
+
+    const handleDeleteTemplate = (key) => {
+        if (confirm(`Ta bort mallen "${key}"?`)) {
+            const newTemplates = { ...templates };
+            delete newTemplates[key];
+            updateTemplates(newTemplates);
+        }
+    };
+
+    const handleSaveTemplate = (key, data) => {
+        const newTemplates = { ...templates, [key]: data };
+        updateTemplates(newTemplates);
     };
 
     const handleTitleBlur = async (index, newTitle, quizId) => {
@@ -280,16 +314,17 @@ export default function TeacherDashboard({ state, dispatch }) {
                         </button>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm flex flex-col justify-between">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <div className="lg:col-span-3 bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
+                                    <button onClick={() => setShowTemplateManager(true)} className="text-slate-500 hover:text-white transition-colors cursor-pointer" title="Konfigurera mallar"><Settings className="w-4 h-4" /></button>
                                 </div>
 
                                 {/* Prompt Template Selector */}
                                 <div className="flex flex-wrap gap-2 mb-3">
-                                    {Object.keys(PROMPT_TEMPLATES).map(key => (
+                                    {Object.keys(templates).map(key => (
                                         <button
                                             key={key}
                                             onClick={() => handlePromptTemplateChange(key)}
@@ -298,19 +333,19 @@ export default function TeacherDashboard({ state, dispatch }) {
                                                 : 'bg-slate-800 text-slate-400 border-white/5 hover:bg-slate-700 hover:text-white'
                                                 }`}
                                         >
-                                            {PROMPT_TEMPLATES[key].label}
+                                            {templates[key].label}
                                         </button>
                                     ))}
                                 </div>
 
-                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-28 overflow-y-auto shadow-inner select-all whitespace-pre-wrap no-scrollbar">
+                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-24 overflow-y-auto shadow-inner select-all whitespace-pre-wrap no-scrollbar">
                                     {currentPromptText}
                                 </div>
                             </div>
                             <button onClick={handleCopyPrompt} className="mt-2 w-full py-2 bg-indigo-600/80 text-white font-bold rounded-lg hover:bg-indigo-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5 cursor-pointer"><Copy className="w-3 h-3" /> Kopiera Prompt</button>
                         </div>
 
-                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between backdrop-blur-sm">
+                        <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between backdrop-blur-sm">
                             <div>
                                 <div className="flex items-center gap-2 mb-2 text-white font-bold text-sm"><Copy className="w-4 h-4 text-indigo-400" /> Klistra in JSON</div>
                                 <textarea
@@ -430,6 +465,62 @@ export default function TeacherDashboard({ state, dispatch }) {
                                     <div key={cat} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg text-sm text-white border border-white/5">
                                         {cat}
                                         <button onClick={() => dispatch({ type: 'DELETE_CATEGORY', payload: cat })} className="text-slate-400 hover:text-red-400 ml-1 cursor-pointer"><X className="w-3 h-3" /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showTemplateManager && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-white/10 animate-fade-in flex flex-col max-h-[90vh]">
+                        <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-800/50">
+                            <h3 className="font-bold text-xl text-white flex items-center gap-2"><Settings className="w-5 h-5" /> Konfigurera Mallar</h3>
+                            <button onClick={() => setShowTemplateManager(false)} className="text-slate-400 hover:text-white cursor-pointer"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-6">
+                            <div className="flex justify-end">
+                                <button onClick={handleResetTemplates} className="text-xs text-red-400 hover:text-red-300 underline cursor-pointer">Återställ till standard</button>
+                            </div>
+
+                            {/* Add New Template Form */}
+                            <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3">
+                                <h4 className="font-bold text-white text-sm">Lägg till / Redigera</h4>
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const formData = new FormData(e.target);
+                                    const key = formData.get('label');
+                                    if (key) {
+                                        handleSaveTemplate(key, {
+                                            label: key,
+                                            description: formData.get('description'),
+                                            prompt: formData.get('prompt')
+                                        });
+                                        e.target.reset();
+                                    }
+                                }} className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input name="label" placeholder="Namn (t.ex. Matte)" required className="p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm" />
+                                        <input name="description" placeholder="Beskrivning" className="p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm" />
+                                    </div>
+                                    <textarea name="prompt" placeholder="Prompt text..." required className="w-full h-24 p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm font-mono resize-none" />
+                                    <button type="submit" className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm cursor-pointer">Spara Mall</button>
+                                </form>
+                            </div>
+
+                            {/* List Existing */}
+                            <div className="space-y-2">
+                                <h4 className="font-bold text-white text-sm">Befintliga Mallar</h4>
+                                {Object.entries(templates).map(([key, tpl]) => (
+                                    <div key={key} className="flex items-start justify-between bg-white/5 p-3 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                                        <div>
+                                            <div className="font-bold text-white text-sm">{tpl.label}</div>
+                                            <div className="text-xs text-slate-400">{tpl.description}</div>
+                                            <div className="text-[10px] text-slate-500 font-mono mt-1 truncate max-w-md">{typeof tpl.prompt === 'string' ? tpl.prompt : '(Funktion)'}</div>
+                                        </div>
+                                        <button onClick={() => handleDeleteTemplate(key)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer" title="Ta bort"><Trash2 className="w-4 h-4" /></button>
                                     </div>
                                 ))}
                             </div>

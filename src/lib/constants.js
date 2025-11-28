@@ -63,8 +63,8 @@ export const PROMPT_TEMPLATES = {
     },
     "Exit Ticket": {
         label: "Exit Ticket",
-        description: "Snabba kontrollfrågor",
-        prompt: `${BASE_INTRO} Frågorna ska vara snabba att läsa och kontrollera att man förstått den absoluta kärnan i materialet. ${JSON_STRUCTURE}`
+        description: "Snabba kontrollfrågor (6 st)",
+        prompt: `${BASE_INTRO} Skapa 6 frågor. Frågorna ska vara snabba att läsa och kontrollera att man förstått den absoluta kärnan i materialet. ${JSON_STRUCTURE}`
     },
     "Nivåstegrande": {
         label: "Nivåstegrande",
@@ -74,7 +74,12 @@ export const PROMPT_TEMPLATES = {
     "Matte": {
         label: "Matte",
         description: "Matematiska formler (LaTeX)",
-        prompt: `${BASE_INTRO} Skapa ett matte-quiz. Använd LaTeX för matematiska formler. Omgiv inline-formler med $...$ och block-formler med $$...$$. Exempel: $x^2$ eller $$\\frac{a}{b}$$. ${JSON_STRUCTURE}`
+        prompt: `Agera som en expertlärare i matematik på gymnasienivå. Skapa ett matte-quiz med 12 frågor. Använd LaTeX för matematiska formler. Omgiv inline-formler med $...$ och block-formler med $$...$$. Exempel: $x^2$ eller $$\\frac{a}{b}$$. ${JSON_STRUCTURE}`
+    },
+    "S/F": {
+        label: "S/F",
+        description: "Sant eller Falskt",
+        prompt: `${BASE_INTRO} Skapa frågor av typen Sant eller Falskt. Varje fråga ska vara ett påstående. Svarsalternativen MÅSTE vara exakt ["Sant", "Falskt"]. Se till att det rätta svaret varierar slumpmässigt mellan Sant och Falskt. ${JSON_STRUCTURE}`
     },
     "Party": {
         label: "Party",
