@@ -294,8 +294,8 @@ export default function TeacherDashboard({ state, dispatch }) {
                                             key={key}
                                             onClick={() => handlePromptTemplateChange(key)}
                                             className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${selectedPromptTemplate === key
-                                                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/20'
-                                                    : 'bg-slate-800 text-slate-400 border-white/5 hover:bg-slate-700 hover:text-white'
+                                                ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/20'
+                                                : 'bg-slate-800 text-slate-400 border-white/5 hover:bg-slate-700 hover:text-white'
                                                 }`}
                                         >
                                             {PROMPT_TEMPLATES[key].label}
@@ -303,7 +303,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                                     ))}
                                 </div>
 
-                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-32 overflow-y-auto shadow-inner select-all whitespace-pre-wrap">
+                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-20 overflow-y-auto shadow-inner select-all whitespace-pre-wrap no-scrollbar">
                                     {currentPromptText}
                                 </div>
                             </div>

@@ -78,21 +78,4 @@ export const PROMPT_TEMPLATES = {
     }
 };
 
-export const DEFAULT_QUIZ_JSON = JSON.stringify({
-    title: "Exempel: Webb & Design",
-    category: "Webbutveckling",
-    questions: [
-        {
-            question: "Vad står HTML för?",
-            options: ["HyperText Markup Language", "HighTech Made Language", "Home Tool Markup Language", "Hyperlinks and Text Markup Language"],
-            correctAnswerIndex: 0,
-            explanation: "HTML är standardspråket för att skapa webbsidor."
-        },
-        {
-            question: "Vilken CSS-egenskap ändrar textfärg?",
-            options: ["text-color", "font-color", "color", "foreground"],
-            correctAnswerIndex: 2,
-            explanation: "'color' styr textens färg i CSS, medan 'background-color' styr bakgrunden."
-        }
-    ]
-});
+export const DEFAULT_QUIZ_JSON = JSON.stringify({ "title": "Matkultur och Hälsa", "questions": [{ "question": "Vad kännetecknar främst den så kallade 'medelhavskosten' ur ett närings- och kulturperspektiv?", "options": ["Ett högt intag av omättade fetter (t.ex. olivolja), grönsaker, baljväxter och fisk", "En kost som helt utesluter kolhydrater och fokuserar enbart på animaliskt protein", "En diet baserad huvudsakligen på mejeriprodukter och rött kött", "En modern kosthållning som bygger på processade ersättningsprodukter"], "correctAnswerIndex": 0, "explanation": "Medelhavskosten bygger traditionellt på råvaror som finns runt Medelhavet, med fokus på nyttiga fetter, mycket vegetabilier och mindre andel rött kött." }] });
