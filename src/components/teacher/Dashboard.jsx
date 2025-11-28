@@ -289,6 +289,7 @@ export default function TeacherDashboard({ state, dispatch }) {
 
                                 {/* Prompt Template Selector */}
                                 <div className="flex flex-wrap gap-2 mb-3">
+                                    {console.log("Loaded templates:", Object.keys(PROMPT_TEMPLATES))}
                                     {Object.keys(PROMPT_TEMPLATES).map(key => (
                                         <button
                                             key={key}
