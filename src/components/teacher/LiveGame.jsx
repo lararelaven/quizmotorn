@@ -382,7 +382,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     if (!question) return <div className="p-8 text-white">Laddar fråga...</div>;
 
     const isPreview = session.settings?.question_state === 'preview';
-    const questionTextSize = 'text-[30px]';
+    const questionTextSize = 'text-[24px]';
     const isLastQuestion = session.currentQuestionIndex >= session.quizData.questions.length - 1;
 
     return (
@@ -487,7 +487,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative z-10">
+            <div className="flex-1 flex flex-col items-center justify-start pt-32 md:justify-center md:pt-0 p-4 md:p-8 relative z-10">
 
                 {/* Question Text */}
                 <div className="w-full max-w-5xl text-center mb-8 md:mb-12">
@@ -512,12 +512,12 @@ export default function TeacherLiveGame({ session, dispatch }) {
 
                 {/* Content Switch: Preview vs Options */}
                 {isPreview ? (
-                    <div className="flex flex-col items-center justify-center py-12 animate-in zoom-in duration-300">
+                    <div className="flex flex-col items-center justify-center py-12 md:py-4 animate-in zoom-in duration-300">
                         <div className="w-24 h-24 rounded-full bg-indigo-600 flex items-center justify-center mx-auto mb-6 shadow-[0_0_50px_rgba(79,70,229,0.5)] animate-pulse">
                             <Loader2 className="w-12 h-12 text-white animate-spin" />
                         </div>
-                        <h3 className="text-4xl font-black text-white mb-2">Gör dig redo!</h3>
-                        <p className="text-xl text-indigo-300">Svarsalternativen kommer snart...</p>
+                        <h3 className="text-4xl md:text-3xl font-black text-white mb-2">Gör dig redo!</h3>
+                        <p className="text-xl md:text-lg text-indigo-300">Svarsalternativen kommer snart...</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl animate-in fade-in slide-in-from-bottom-8 duration-500">
