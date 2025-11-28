@@ -382,7 +382,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
     if (!question) return <div className="p-8 text-white">Laddar fråga...</div>;
 
     const isPreview = session.settings?.question_state === 'preview';
-    const questionTextSize = 'text-[24px]';
+    const questionTextSize = 'text-[30px]';
     const isLastQuestion = session.currentQuestionIndex >= session.quizData.questions.length - 1;
 
     return (

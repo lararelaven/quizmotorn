@@ -161,7 +161,10 @@ export default function Home() {
   }, []);
 
   const renderView = () => {
-    if (state.session.status === 'finished' && ['student_game', 'student_lobby'].includes(state.view)) {
+    if (
+      (state.session.status === 'finished' || state.session.currentQuestionIndex >= state.session.quizData.questions.length) &&
+      ['student_game', 'student_lobby'].includes(state.view)
+    ) {
       return <StudentFinished player={state.currentPlayer} dispatch={dispatch} />;
     }
 

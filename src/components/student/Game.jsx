@@ -15,6 +15,8 @@ const gradients = [
 export default function StudentGame({ session, player, dispatch }) {
     const questionIndex = session.currentQuestionIndex;
     const question = session.quizData.questions[questionIndex];
+
+    if (!question) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><Loader2 className="w-8 h-8 animate-spin" /></div>;
     const showAnswer = session.settings.showAnswer;
 
     const [selectedOption, setSelectedOption] = useState(null);
