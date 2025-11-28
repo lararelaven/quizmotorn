@@ -222,12 +222,23 @@ export default function TeacherLiveGame({ session, dispatch }) {
             setTimeLeft(session.settings.timerDuration);
         }
 
+        // Determine next state based on timer setting
+        const nextState = session.settings.timerEnabled ? 'preview' : 'answering';
+        const startTime = session.settings.timerEnabled ? null : Date.now();
+
+        const newSettings = {
+            ...session.settings,
+            showAnswer: false,
+            question_state: nextState,
+            ...(startTime && { question_start_time: startTime })
+        };
+
         // Uppdatera lokalt
         dispatch({
             type: 'UPDATE_SESSION',
             payload: {
                 currentQuestionIndex: nextIndex,
-                settings: { ...session.settings, showAnswer: false, question_state: 'preview' }
+                settings: newSettings
             }
         });
 
@@ -236,7 +247,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
             .from('sessions')
             .update({
                 current_question_index: nextIndex,
-                settings: { ...session.settings, showAnswer: false, question_state: 'preview' }
+                settings: newSettings
             })
             .eq('id', session.id);
     };
@@ -558,9 +569,11 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                             </div>
                                         )}
 
-                                        {/* Result Icons */}
+                                        {/* Result Icons - Absolute Top Right */}
                                         {showResult && isCorrect && (
-                                            <CheckCircle className="w-8 h-8 text-green-400 ml-4 animate-bounce" />
+                                            <div className="absolute top-2 right-2">
+                                                <CheckCircle className="w-8 h-8 text-green-400 animate-bounce drop-shadow-lg" />
+                                            </div>
                                         )}
                                     </div>
                                     {/* Border gradient background */}
