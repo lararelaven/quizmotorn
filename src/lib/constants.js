@@ -71,6 +71,11 @@ export const PROMPT_TEMPLATES = {
         description: "Från enkelt till svårt",
         prompt: `${BASE_INTRO} Börja med 4 enkla minnesfrågor, följ upp med 4 frågor om förståelse, och avsluta med 4 svåra frågor som kräver analys/tillämpning, men försök hålla ner textmängden. ${JSON_STRUCTURE}`
     },
+    "Matte": {
+        label: "Matte",
+        description: "Matematiska formler (LaTeX)",
+        prompt: `${BASE_INTRO} Skapa ett matte-quiz. Använd LaTeX för matematiska formler. Omgiv inline-formler med $...$ och block-formler med $$...$$. Exempel: $x^2$ eller $$\\frac{a}{b}$$. ${JSON_STRUCTURE}`
+    },
     "Party": {
         label: "Party",
         description: "Slumpat ämne för fest",

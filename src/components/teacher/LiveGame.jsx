@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Trophy, StopCircle, Monitor, ArrowRight, Maximize2, Loader2, CheckCircle, Users, ChevronDown, X, Info } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import MathRenderer from '../MathRenderer';
 
 // Constants for styling (matching Student View)
 const letters = ['A', 'B', 'C', 'D'];
@@ -491,7 +492,7 @@ export default function TeacherLiveGame({ session, dispatch }) {
                 {/* Question Text */}
                 <div className="w-full max-w-5xl text-center mb-8 md:mb-12">
                     <h2 className={`${questionTextSize} font-bold text-white leading-tight drop-shadow-lg`}>
-                        {question.question}
+                        <MathRenderer>{question.question}</MathRenderer>
                     </h2>
                 </div>
 
@@ -559,7 +560,9 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                         </div>
 
                                         {/* Option Text */}
-                                        <span className="text-2xl font-bold text-white leading-tight flex-1">{opt}</span>
+                                        <span className="text-2xl font-bold text-white leading-tight flex-1">
+                                            <MathRenderer>{opt}</MathRenderer>
+                                        </span>
 
                                         {/* Response Count (Only when answer is shown) */}
                                         {showResult && (

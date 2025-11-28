@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Loader2, Check, X, Frown, Trophy } from 'lucide-react';
+import MathRenderer from '../MathRenderer';
 
 const letters = ['A', 'B', 'C', 'D'];
 const gradients = [
@@ -209,7 +210,9 @@ export default function StudentGame({ session, player, dispatch }) {
             </div>
 
             <div className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full pb-[50vh] md:pb-0">
-                <h2 className="text-2xl font-bold text-white text-center mb-8">{question.question}</h2>
+                <h2 className="text-2xl font-bold text-white text-center mb-8">
+                    <MathRenderer>{question.question}</MathRenderer>
+                </h2>
 
                 {/* Hybris Controls - Visible in Preview AND Answering (if not answered) */}
                 {session.settings.gamificationMode === 'hybris' && !hasAnswered && !showAnswer && (
@@ -344,7 +347,9 @@ export default function StudentGame({ session, player, dispatch }) {
                                     `}>
                                             {letters[idx]}
                                         </div>
-                                        <span className={`text-xl md:text-2xl font-bold text-white leading-tight w-full ${textClass}`}>{opt}</span>
+                                        <span className={`text-xl md:text-2xl font-bold text-white leading-tight w-full ${textClass}`}>
+                                            <MathRenderer>{opt}</MathRenderer>
+                                        </span>
                                         {showAnswer && isSelected && isCorrect && (
                                             <Check className="w-8 h-8 text-white absolute top-2 right-2 md:static md:ml-auto animate-bounce" />
                                         )}
