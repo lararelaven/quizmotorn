@@ -21,15 +21,31 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [quizToDelete, setQuizToDelete] = useState(null);
 
     // Prompt Template State
-    const [templates, setTemplates] = useState(PROMPT_TEMPLATES);
+    const [templates, setTemplates] = useState(() => {
+        return Object.entries(PROMPT_TEMPLATES).map(([key, val]) => ({
+            id: key,
+            ...val
+        }));
+    });
     const [selectedPromptTemplate, setSelectedPromptTemplate] = useState("Standard");
     const [currentPromptText, setCurrentPromptText] = useState(AI_PROMPT_TEXT);
     const [showTemplateManager, setShowTemplateManager] = useState(false);
+    const [draggedItem, setDraggedItem] = useState(null);
 
     useEffect(() => {
         const saved = localStorage.getItem('quiz_templates');
         if (saved) {
-            setTemplates(JSON.parse(saved));
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    setTemplates(parsed);
+                } else {
+                    // Migration from object to array
+                    setTemplates(Object.entries(parsed).map(([key, val]) => ({ id: key, ...val })));
+                }
+            } catch (e) {
+                console.error("Failed to parse templates", e);
+            }
         }
     }, []);
 
@@ -70,6 +86,20 @@ export default function TeacherDashboard({ state, dispatch }) {
             }
 
             const shuffle = (array) => {
+                // Don't shuffle if it's Sant/Falskt
+                const isTrueFalse = array.length === 2 &&
+                    array.some(a => String(a).toLowerCase() === 'sant') &&
+                    array.some(a => String(a).toLowerCase() === 'falskt');
+
+                if (isTrueFalse) {
+                    // Ensure Sant comes first
+                    return array.sort((a, b) => {
+                        if (String(a).toLowerCase() === 'sant') return -1;
+                        if (String(b).toLowerCase() === 'sant') return 1;
+                        return 0;
+                    });
+                }
+
                 let currentIndex = array.length, randomIndex;
                 while (currentIndex !== 0) {
                     randomIndex = Math.floor(Math.random() * currentIndex);
@@ -148,11 +178,13 @@ export default function TeacherDashboard({ state, dispatch }) {
         document.body.removeChild(textArea);
     };
 
-    const handlePromptTemplateChange = (templateKey) => {
-        setSelectedPromptTemplate(templateKey);
-        const template = templates[templateKey];
+    const handlePromptTemplateChange = (templateId) => {
+        setSelectedPromptTemplate(templateId);
+        const template = templates.find(t => t.id === templateId);
 
-        if (templateKey === "Party") {
+        if (!template) return;
+
+        if (templateId === "Party") {
             const randomTopic = PARTY_TOPICS[Math.floor(Math.random() * PARTY_TOPICS.length)];
             setCurrentPromptText(template.prompt(randomTopic));
         } else {
@@ -162,22 +194,59 @@ export default function TeacherDashboard({ state, dispatch }) {
 
     const handleResetTemplates = () => {
         if (confirm("Är du säker på att du vill återställa alla mallar till standard?")) {
-            updateTemplates(PROMPT_TEMPLATES);
+            const defaults = Object.entries(PROMPT_TEMPLATES).map(([key, val]) => ({ id: key, ...val }));
+            updateTemplates(defaults);
             setShowTemplateManager(false);
         }
     };
 
-    const handleDeleteTemplate = (key) => {
-        if (confirm(`Ta bort mallen "${key}"?`)) {
-            const newTemplates = { ...templates };
-            delete newTemplates[key];
+    const handleDeleteTemplate = (id) => {
+        if (confirm(`Ta bort mallen?`)) {
+            const newTemplates = templates.filter(t => t.id !== id);
             updateTemplates(newTemplates);
         }
     };
 
-    const handleSaveTemplate = (key, data) => {
-        const newTemplates = { ...templates, [key]: data };
+    const handleSaveTemplate = (id, data) => {
+        const existingIndex = templates.findIndex(t => t.id === id);
+        let newTemplates;
+        if (existingIndex >= 0) {
+            newTemplates = [...templates];
+            newTemplates[existingIndex] = { ...newTemplates[existingIndex], ...data };
+        } else {
+            newTemplates = [...templates, { id, ...data }];
+        }
         updateTemplates(newTemplates);
+    };
+
+    // Drag and Drop Handlers
+    const handleDragStart = (e, index) => {
+        setDraggedItem(templates[index]);
+        e.dataTransfer.effectAllowed = "move";
+        // e.dataTransfer.setDragImage(e.target, 20, 20); // Optional custom drag image
+    };
+
+    const handleDragOver = (e, index) => {
+        e.preventDefault();
+        const draggedOverItem = templates[index];
+
+        // If the item is dragged over itself, ignore
+        if (draggedItem === draggedOverItem) {
+            return;
+        }
+
+        // Filter out the currently dragged item
+        let items = templates.filter(item => item !== draggedItem);
+
+        // Add the dragged item after the dragged over item
+        items.splice(index, 0, draggedItem);
+
+        setTemplates(items);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedItem(null);
+        updateTemplates(templates); // Save the new order
     };
 
     const handleTitleBlur = async (index, newTitle, quizId) => {
@@ -324,16 +393,16 @@ export default function TeacherDashboard({ state, dispatch }) {
 
                                 {/* Prompt Template Selector */}
                                 <div className="flex flex-wrap gap-2 mb-3">
-                                    {Object.keys(templates).map(key => (
+                                    {templates.map(tpl => (
                                         <button
-                                            key={key}
-                                            onClick={() => handlePromptTemplateChange(key)}
-                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${selectedPromptTemplate === key
+                                            key={tpl.id}
+                                            onClick={() => handlePromptTemplateChange(tpl.id)}
+                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${selectedPromptTemplate === tpl.id
                                                 ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/20'
                                                 : 'bg-slate-800 text-slate-400 border-white/5 hover:bg-slate-700 hover:text-white'
                                                 }`}
                                         >
-                                            {templates[key].label}
+                                            {tpl.label}
                                         </button>
                                     ))}
                                 </div>
@@ -512,15 +581,22 @@ export default function TeacherDashboard({ state, dispatch }) {
 
                             {/* List Existing */}
                             <div className="space-y-2">
-                                <h4 className="font-bold text-white text-sm">Befintliga Mallar</h4>
-                                {Object.entries(templates).map(([key, tpl]) => (
-                                    <div key={key} className="flex items-start justify-between bg-white/5 p-3 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                                <h4 className="font-bold text-white text-sm">Befintliga Mallar (Dra för att ändra ordning)</h4>
+                                {templates.map((tpl, idx) => (
+                                    <div
+                                        key={tpl.id}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, idx)}
+                                        onDragOver={(e) => handleDragOver(e, idx)}
+                                        onDragEnd={handleDragEnd}
+                                        className="flex items-start justify-between bg-white/5 p-3 rounded-xl border border-white/5 hover:bg-white/10 transition-colors cursor-move active:cursor-grabbing"
+                                    >
                                         <div>
                                             <div className="font-bold text-white text-sm">{tpl.label}</div>
                                             <div className="text-xs text-slate-400">{tpl.description}</div>
                                             <div className="text-[10px] text-slate-500 font-mono mt-1 truncate max-w-md">{typeof tpl.prompt === 'string' ? tpl.prompt : '(Funktion)'}</div>
                                         </div>
-                                        <button onClick={() => handleDeleteTemplate(key)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer" title="Ta bort"><Trash2 className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDeleteTemplate(tpl.id)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer" title="Ta bort"><Trash2 className="w-4 h-4" /></button>
                                     </div>
                                 ))}
                             </div>
