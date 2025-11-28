@@ -284,12 +284,11 @@ export default function TeacherDashboard({ state, dispatch }) {
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen (v2)</div>
+                                    <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
                                 </div>
 
                                 {/* Prompt Template Selector */}
                                 <div className="flex flex-wrap gap-2 mb-3">
-                                    {console.log("Loaded templates:", Object.keys(PROMPT_TEMPLATES))}
                                     {Object.keys(PROMPT_TEMPLATES).map(key => (
                                         <button
                                             key={key}
