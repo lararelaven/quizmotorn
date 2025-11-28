@@ -32,7 +32,8 @@ export const JEOPARDY_COLORS = [
     'bg-orange-200 hover:bg-orange-300 text-orange-900'
 ];
 
-export const AI_PROMPT_TEXT = `Skapa ett JSON-objekt för ett quiz med 15 frågor. 
+export const AI_PROMPT_TEXT = `Agera som en expertlärare på gymnasienivå.
+Skapa ett JSON-objekt för ett quiz med 12 frågor. 
 Strukturen måste vara strikt enligt följande format:
 
 {
@@ -46,8 +47,56 @@ Strukturen måste vara strikt enligt följande format:
     }
   ]
 }
-Svara med endast JSON-objektet. Inget annat.
-`;
+Svara med endast JSON-objektet. Inget annat.`;
+
+export const PARTY_TOPICS = [
+    "Bilmärken", "Odling", "Naturkunskap", "Matematik", "Historia", "Kändisar", "Geografi", "Film", "Musik", "Sport",
+    "Djur", "Rymden", "Teknik", "Matlagning", "Litteratur", "Konst", "Politik", "Ekonomi", "Psykologi", "Filosofi",
+    "Religion", "Språk", "Kemi", "Fysik", "Biologi", "Medicin", "Astronomi", "Arkitektur", "Mode", "Design",
+    "Fotografi", "Dans", "Teater", "Spel", "Serier", "Anime", "Manga", "K-pop", "Hiphop", "Rock",
+    "Jazz", "Klassisk musik", "Opera", "Musikal", "Cirkus", "Trolleri", "Stand-up", "Improvisationsteater", "Poesi", "Noveller",
+    "Romaner", "Deckare", "Fantasy", "Sci-fi", "Skräck", "Thriller", "Komedi", "Drama", "Action", "Äventyr",
+    "Dokumentär", "Reality-TV", "Nyheter", "Väder", "Klimat", "Miljö", "Hållbarhet", "Återvinning", "Energi", "Transport",
+    "Resor", "Turism", "Kultur", "Traditioner", "Högtider", "Matkultur", "Dryckeskultur", "Kaffekultur", "Tekultur", "Vinkultur",
+    "Ölkultur", "Whiskykultur", "Cocktailkultur", "Bakning", "Grillning", "Vegetariskt", "Veganskt", "Kött", "Fisk", "Skaldjur",
+    "Frukt", "Grönsaker", "Bär", "Svamp", "Kryddor", "Örter", "Blommor", "Träd", "Buskar", "Gräs"
+];
+
+export const PROMPT_TEMPLATES = {
+    "Standard": {
+        label: "Standard",
+        description: "Vanligt quiz med 12 frågor",
+        prompt: AI_PROMPT_TEXT
+    },
+    "Luriga Fällan": {
+        label: "Luriga Fällan",
+        description: "Fokus på missuppfattningar",
+        prompt: `${AI_PROMPT_TEXT}
+        
+Fokusera på vanliga missuppfattningar. De felaktiga svarsalternativen måste vara "troliga fel" som man gör om man inte förstått fullt ut.`
+    },
+    "Exit Ticket": {
+        label: "Exit Ticket",
+        description: "Snabba kontrollfrågor",
+        prompt: `${AI_PROMPT_TEXT}
+        
+Frågorna ska vara snabba att läsa och kontrollera att man förstått den absoluta kärnan i materialet.`
+    },
+    "Nivåstegrande": {
+        label: "Nivåstegrande",
+        description: "Från enkelt till svårt",
+        prompt: `${AI_PROMPT_TEXT}
+        
+Börja med 4 enkla minnesfrågor, följ upp med 4 frågor om förståelse, och avsluta med 4 svåra frågor som kräver analys/tillämpning, men försök hålla ner textmängden.`
+    },
+    "Party": {
+        label: "Party",
+        description: "Slumpat ämne för fest",
+        prompt: (topic) => `${AI_PROMPT_TEXT}
+        
+Skapa frågor om ämnet: ${topic}.`
+    }
+};
 
 export const DEFAULT_QUIZ_JSON = JSON.stringify({
     title: "Exempel: Webb & Design",

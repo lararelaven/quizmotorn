@@ -5,7 +5,7 @@ import {
     Plus, Bot, Copy, BookOpen, Edit2, Trash2, Smartphone, Grid,
     Settings, X, Shuffle, Zap, CheckCircle, LogOut, Gamepad2, Tag, FilePlus, ArrowRight, AlertTriangle, Save, Loader2, Trophy
 } from 'lucide-react';
-import { AI_PROMPT_TEXT, DEFAULT_QUIZ_JSON } from '../../lib/constants';
+import { AI_PROMPT_TEXT, DEFAULT_QUIZ_JSON, PROMPT_TEMPLATES, PARTY_TOPICS } from '../../lib/constants';
 import { generateTeamNames, generatePin } from '../../lib/utils';
 import { supabase } from '@/lib/supabase';
 
@@ -19,6 +19,10 @@ export default function TeacherDashboard({ state, dispatch }) {
     const [showCategoryManager, setShowCategoryManager] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
     const [quizToDelete, setQuizToDelete] = useState(null);
+
+    // Prompt Template State
+    const [selectedPromptTemplate, setSelectedPromptTemplate] = useState("Standard");
+    const [currentPromptText, setCurrentPromptText] = useState(AI_PROMPT_TEXT);
 
     const [startingSession, setStartingSession] = useState(false);
 
@@ -123,11 +127,23 @@ export default function TeacherDashboard({ state, dispatch }) {
 
     const handleCopyPrompt = () => {
         const textArea = document.createElement("textarea");
-        textArea.value = AI_PROMPT_TEXT;
+        textArea.value = currentPromptText;
         document.body.appendChild(textArea);
         textArea.select();
         try { document.execCommand('copy'); } catch (err) { console.error('Fallback copy failed', err); }
         document.body.removeChild(textArea);
+    };
+
+    const handlePromptTemplateChange = (templateKey) => {
+        setSelectedPromptTemplate(templateKey);
+        const template = PROMPT_TEMPLATES[templateKey];
+
+        if (templateKey === "Party") {
+            const randomTopic = PARTY_TOPICS[Math.floor(Math.random() * PARTY_TOPICS.length)];
+            setCurrentPromptText(template.prompt(randomTopic));
+        } else {
+            setCurrentPromptText(template.prompt);
+        }
     };
 
     const handleTitleBlur = async (index, newTitle, quizId) => {
@@ -267,8 +283,29 @@ export default function TeacherDashboard({ state, dispatch }) {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 h-full backdrop-blur-sm flex flex-col justify-between">
                             <div>
-                                <div className="flex items-center gap-2 mb-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
-                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-32 overflow-y-auto shadow-inner select-all">{AI_PROMPT_TEXT}</div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm"><Bot className="w-4 h-4" /> AI-Hjälpen</div>
+                                </div>
+
+                                {/* Prompt Template Selector */}
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    {Object.keys(PROMPT_TEMPLATES).map(key => (
+                                        <button
+                                            key={key}
+                                            onClick={() => handlePromptTemplateChange(key)}
+                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${selectedPromptTemplate === key
+                                                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/20'
+                                                    : 'bg-slate-800 text-slate-400 border-white/5 hover:bg-slate-700 hover:text-white'
+                                                }`}
+                                        >
+                                            {PROMPT_TEMPLATES[key].label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-32 overflow-y-auto shadow-inner select-all whitespace-pre-wrap">
+                                    {currentPromptText}
+                                </div>
                             </div>
                             <button onClick={handleCopyPrompt} className="mt-2 w-full py-2 bg-indigo-600/80 text-white font-bold rounded-lg hover:bg-indigo-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5 cursor-pointer"><Copy className="w-3 h-3" /> Kopiera Prompt</button>
                         </div>
