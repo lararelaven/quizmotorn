@@ -513,6 +513,11 @@ export default function TeacherLiveGame({ session, dispatch }) {
                             const isCorrect = idx === question.correctAnswerIndex;
                             const showResult = showAnswer;
 
+                            // Calculate response count for this option
+                            const voteCount = connectedPlayers.filter(p =>
+                                p.answers && p.answers[session.currentQuestionIndex] === idx
+                            ).length;
+
                             // Teacher View Styling (Letter + Dark BG + Colored Border)
                             let containerClass = `
                             relative overflow-hidden rounded-2xl p-1 transition-all duration-300
@@ -543,11 +548,19 @@ export default function TeacherLiveGame({ session, dispatch }) {
                                         </div>
 
                                         {/* Option Text */}
-                                        <span className="text-2xl font-bold text-white leading-tight">{opt}</span>
+                                        <span className="text-2xl font-bold text-white leading-tight flex-1">{opt}</span>
+
+                                        {/* Response Count (Only when answer is shown) */}
+                                        {showResult && (
+                                            <div className="flex flex-col items-end animate-in fade-in slide-in-from-right-4 duration-500">
+                                                <span className="text-3xl font-black text-white leading-none">{voteCount}</span>
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">svar</span>
+                                            </div>
+                                        )}
 
                                         {/* Result Icons */}
                                         {showResult && isCorrect && (
-                                            <CheckCircle className="w-8 h-8 text-green-400 ml-auto animate-bounce" />
+                                            <CheckCircle className="w-8 h-8 text-green-400 ml-4 animate-bounce" />
                                         )}
                                     </div>
                                     {/* Border gradient background */}
