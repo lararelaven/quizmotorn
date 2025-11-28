@@ -303,7 +303,7 @@ export default function TeacherDashboard({ state, dispatch }) {
                                     ))}
                                 </div>
 
-                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-20 overflow-y-auto shadow-inner select-all whitespace-pre-wrap no-scrollbar">
+                                <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-28 overflow-y-auto shadow-inner select-all whitespace-pre-wrap no-scrollbar">
                                     {currentPromptText}
                                 </div>
                             </div>
