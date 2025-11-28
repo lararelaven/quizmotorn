@@ -32,22 +32,10 @@ export const JEOPARDY_COLORS = [
     'bg-orange-200 hover:bg-orange-300 text-orange-900'
 ];
 
-export const AI_PROMPT_TEXT = `Agera som en expertlärare på gymnasienivå.
-Skapa ett JSON-objekt för ett quiz med 12 frågor. 
-Strukturen måste vara strikt enligt följande format:
+const BASE_INTRO = "Agera som en expertlärare på gymnasienivå. Skapa ett JSON-objekt för ett quiz med 12 frågor.";
+const JSON_STRUCTURE = `Strukturen måste vara strikt enligt följande format: {"title": "Titel", "questions": [{"question": "Fråga?", "options": ["Alt 1", "Alt 2", "Alt 3", "Alt 4"], "correctAnswerIndex": 0, "explanation": "Kort förklaring"}]}. Svara med endast JSON-objektet. Inget annat.`;
 
-{
-  "title": "Titel på quizet",
-  "questions": [
-    {
-      "question": "Frågetext?",
-      "options": ["Alt 1", "Alt 2", "Alt 3", "Alt 4"],
-      "correctAnswerIndex": 0,
-      "explanation": "Kort förklaring."
-    }
-  ]
-}
-Svara med endast JSON-objektet. Inget annat.`;
+export const AI_PROMPT_TEXT = `${BASE_INTRO} ${JSON_STRUCTURE}`;
 
 export const PARTY_TOPICS = [
     "Bilmärken", "Odling", "Naturkunskap", "Matematik", "Historia", "Kändisar", "Geografi", "Film", "Musik", "Sport",
@@ -71,30 +59,22 @@ export const PROMPT_TEMPLATES = {
     "Luriga Fällan": {
         label: "Luriga Fällan",
         description: "Fokus på missuppfattningar",
-        prompt: `${AI_PROMPT_TEXT}
-        
-Fokusera på vanliga missuppfattningar. De felaktiga svarsalternativen måste vara "troliga fel" som man gör om man inte förstått fullt ut.`
+        prompt: `${BASE_INTRO} Fokusera på vanliga missuppfattningar. De felaktiga svarsalternativen måste vara "troliga fel" som man gör om man inte förstått fullt ut. ${JSON_STRUCTURE}`
     },
     "Exit Ticket": {
         label: "Exit Ticket",
         description: "Snabba kontrollfrågor",
-        prompt: `${AI_PROMPT_TEXT}
-        
-Frågorna ska vara snabba att läsa och kontrollera att man förstått den absoluta kärnan i materialet.`
+        prompt: `${BASE_INTRO} Frågorna ska vara snabba att läsa och kontrollera att man förstått den absoluta kärnan i materialet. ${JSON_STRUCTURE}`
     },
     "Nivåstegrande": {
         label: "Nivåstegrande",
         description: "Från enkelt till svårt",
-        prompt: `${AI_PROMPT_TEXT}
-        
-Börja med 4 enkla minnesfrågor, följ upp med 4 frågor om förståelse, och avsluta med 4 svåra frågor som kräver analys/tillämpning, men försök hålla ner textmängden.`
+        prompt: `${BASE_INTRO} Börja med 4 enkla minnesfrågor, följ upp med 4 frågor om förståelse, och avsluta med 4 svåra frågor som kräver analys/tillämpning, men försök hålla ner textmängden. ${JSON_STRUCTURE}`
     },
     "Party": {
         label: "Party",
         description: "Slumpat ämne för fest",
-        prompt: (topic) => `${AI_PROMPT_TEXT}
-        
-Skapa frågor om ämnet: ${topic}.`
+        prompt: (topic) => `${BASE_INTRO} Skapa frågor om ämnet: ${topic}. ${JSON_STRUCTURE}`
     }
 };
 
@@ -115,5 +95,4 @@ export const DEFAULT_QUIZ_JSON = JSON.stringify({
             explanation: "'color' styr textens färg i CSS, medan 'background-color' styr bakgrunden."
         }
     ]
-
-}, null, 2);
+});
