@@ -146,7 +146,9 @@ export const gameReducer = (state, action) => {
                         teams: jeopardyTeams,
                         completedQuestions: [],
                         questionModifiers: questionModifiers,
-                        currentTeamTurn: 0
+                        currentTeamTurn: 0,
+                        scoreMode: settings.scoreMode || 'flat',
+                        columns: settings.columns || 6
                     }
                 }
             };

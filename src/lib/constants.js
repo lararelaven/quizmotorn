@@ -11,12 +11,12 @@ export const NOUNS = [
 ];
 
 export const FUN_TEAM_NAMES = [
-    "Syntax Error", "Lag Lagg", "Kaffeknarkarna", "Ctrl+Alt+Defeat", "404 Brain Not Found",
-    "De Vilda Vetrarna", "Google Mästrarna", "Quiz-Riddarna", "Den Sista Cellen", "Beta Testarna",
-    "Hårddiskarna", "Pixel Piraterna", "Cyber-Svamparna", "De Analoga", "Zoom-Zombies",
-    "Git Push It", "JavaSipparna", "Python Ormarna", "CSS-Stylisterna", "HTML-Hjältarna",
-    "Data Dårarna", "Skärmsläckarna", "Tangentbordskrigarna", "Wi-Fi Visarna", "Buffrarna",
-    "Binära Björnarna", "Kompilerarna", "Bug Jägarna", "Ram-Minnesmästarna", "Blue Screen Survivors"
+    "De Vilda", "Snilleblixtarna", "Quiz-Mästarna", "Hjärnkontoret", "Segrarna",
+    "Lag 1", "Superhjältarna", "Tänkarna", "Gissarna", "Vinnarna",
+    "Blixtarna", "Stjärnorna", "Genierna", "Mästarna", "Kämparna",
+    "Falkarna", "Lejonen", "Tigrarna", "Vargarna", "Björnarna",
+    "Raketerna", "Kometerna", "Planeterna", "Galaxerna", "Universum",
+    "Alfa", "Beta", "Gamma", "Delta", "Omega"
 ];
 
 export const DEFAULT_CATEGORIES = [

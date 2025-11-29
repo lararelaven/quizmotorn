@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { JEOPARDY_COLORS } from '../../lib/constants';
 import MathRenderer from '../MathRenderer';
+import { LogOut, Lock } from 'lucide-react';
 
 export default function TeacherJeopardy({ session, dispatch }) {
     const [activeQuestion, setActiveQuestion] = useState(null);
@@ -15,8 +16,20 @@ export default function TeacherJeopardy({ session, dispatch }) {
     const currentTeam = session.jeopardyState.teams[currentTeamIdx];
     const currentModifier = activeQuestion !== null ? session.jeopardyState.questionModifiers[activeQuestion] : 'normal';
 
+    const scoreMode = session.jeopardyState.scoreMode || 'flat';
+    const columns = session.jeopardyState.columns || 6;
+
     const handleGridClick = (index) => {
         if (session.jeopardyState.completedQuestions.includes(index)) return;
+
+        // Check if locked (progressive mode)
+        const row = Math.floor(index / columns);
+        const col = index % columns;
+        if (row > 0) {
+            const prevRowIdx = (row - 1) * columns + col;
+            if (!session.jeopardyState.completedQuestions.includes(prevRowIdx)) return;
+        }
+
         setActiveQuestion(index); setShowAnswer(false); setResultState(null);
     };
 
@@ -26,32 +39,40 @@ export default function TeacherJeopardy({ session, dispatch }) {
         const isCorrect = optionIndex === question.correctAnswerIndex;
         setResultState(isCorrect ? 'correct' : 'wrong');
         setShowAnswer(true);
-        let points = currentModifier === 'gamble' ? (isCorrect ? 300 : -300) : (currentModifier === 'double' && isCorrect ? 200 : (isCorrect ? 100 : 0));
-        setTimeout(() => {
-            dispatch({ type: 'JEOPARDY_AWARD_POINTS', payload: { teamIndex: currentTeamIdx, points: points } });
-            setTimeout(() => {
-                dispatch({ type: 'JEOPARDY_COMPLETE_QUESTION', payload: { index: activeQuestion } });
-                setActiveQuestion(null); setResultState(null);
-            }, 2000);
-        }, 1000);
+
+        const row = Math.floor(activeQuestion / columns);
+        const basePoints = scoreMode === 'progressive' ? (row + 1) * 100 : 100;
+
+        let points = 0;
+        if (currentModifier === 'gamble') {
+            points = isCorrect ? basePoints * 3 : -basePoints * 3;
+        } else if (currentModifier === 'double') {
+            points = isCorrect ? basePoints * 2 : 0;
+        } else {
+            points = isCorrect ? basePoints : 0;
+        }
+
+        dispatch({ type: 'JEOPARDY_AWARD_POINTS', payload: { teamIndex: currentTeamIdx, points: points } });
     };
 
     const handleManualClose = () => {
         if (activeQuestion !== null) {
             dispatch({ type: 'JEOPARDY_COMPLETE_QUESTION', payload: { index: activeQuestion } });
             setActiveQuestion(null);
+            setResultState(null);
+            setShowAnswer(false);
         }
     }
 
     return (
-        <div className="h-screen bg-slate-900 text-white flex flex-col overflow-hidden">
-            <div className="bg-white text-slate-900 p-4 shadow-lg flex justify-between items-center z-10">
-                <h2 className="font-bold text-xl">{session.quizData.title}</h2>
-                <div className="flex items-center gap-4">
-                    <div className="text-sm font-bold text-slate-500 flex items-center gap-2"><RotateCw className="w-4 h-4" /> Turas om: <span className="text-indigo-600 uppercase bg-indigo-50 px-2 py-1 rounded">{currentTeam.name}</span></div>
-                    <button onClick={() => dispatch({ type: 'RESET_APP' })} className="px-4 py-1 border border-slate-300 rounded hover:bg-slate-100 text-sm font-bold">Avsluta</button>
-                </div>
-            </div>
+        <div className="h-screen bg-slate-900 text-white flex flex-col overflow-hidden relative">
+            <button
+                onClick={() => dispatch({ type: 'RESET_APP' })}
+                className="absolute top-4 right-4 z-20 p-2 bg-white/10 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-full transition-colors"
+                title="Avsluta"
+            >
+                <LogOut className="w-5 h-5" />
+            </button>
             <div className="flex-1 p-6 overflow-y-auto relative">
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-4 mb-6">
                     {session.jeopardyState.teams.map((team, idx) => (
@@ -66,13 +87,30 @@ export default function TeacherJeopardy({ session, dispatch }) {
                         </div>
                     ))}
                 </div>
-                <div className="grid grid-cols-3 md:grid-cols-6 gap-4 max-w-6xl mx-auto">
+                <div className="grid gap-4 max-w-6xl mx-auto" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
                     {session.quizData.questions.map((q, idx) => {
                         const isCompleted = session.jeopardyState.completedQuestions.includes(idx);
                         const colorClass = JEOPARDY_COLORS[idx % JEOPARDY_COLORS.length];
+
+                        const row = Math.floor(idx / columns);
+                        const col = idx % columns;
+                        const prevRowIdx = (row - 1) * columns + col;
+                        const isLocked = row > 0 && !session.jeopardyState.completedQuestions.includes(prevRowIdx);
+                        const points = scoreMode === 'progressive' ? (row + 1) * 100 : 100;
+
                         return (
-                            <button key={idx} onClick={() => handleGridClick(idx)} disabled={isCompleted} className={`aspect-square rounded-2xl shadow-lg flex items-center justify-center text-4xl font-black transition-all transform relative overflow-hidden ${isCompleted ? 'bg-slate-800 text-slate-600 cursor-not-allowed shadow-inner' : `${colorClass} hover:scale-105 hover:shadow-xl active:scale-95 cursor-pointer`}`}>
-                                {idx + 1}
+                            <button
+                                key={idx}
+                                onClick={() => handleGridClick(idx)}
+                                disabled={isCompleted || isLocked}
+                                className={`aspect-square rounded-2xl shadow-lg flex flex-col items-center justify-center transition-all transform relative overflow-hidden ${isCompleted
+                                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed shadow-inner'
+                                        : isLocked
+                                            ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed border-2 border-slate-700'
+                                            : `${colorClass} hover:scale-105 hover:shadow-xl active:scale-95 cursor-pointer`
+                                    }`}
+                            >
+                                {isLocked ? <Lock className="w-8 h-8 opacity-50" /> : <span className="text-3xl font-black">{points}</span>}
                                 {isCompleted && <div className="absolute inset-0 bg-black/20" />}
                             </button>
                         );
@@ -117,13 +155,15 @@ export default function TeacherJeopardy({ session, dispatch }) {
                                         {resultState === 'correct' ? <CheckCircle className="text-green-600" /> : <XCircle className="text-red-500" />}
                                         {resultState === 'correct' ? 'Rätt svar!' : 'Tyvärr fel...'}
                                     </div>
-                                    <p className="text-indigo-800">{session.quizData.questions[activeQuestion].explanation}</p>
+                                    <p className="text-indigo-800 mt-2">
+                                        <MathRenderer>{session.quizData.questions[activeQuestion].explanation}</MathRenderer>
+                                    </p>
                                 </div>
                             )}
                         </div>
                         <div className="bg-slate-100 p-4 border-t border-slate-200 flex justify-between items-center">
-                            <div className="text-xs text-slate-400">Poäng delas ut automatiskt.</div>
-                            <button onClick={handleManualClose} className="text-slate-500 hover:text-slate-800 font-bold text-sm">Hoppa över</button>
+                            <div className="text-xs text-slate-400"></div>
+                            <button onClick={handleManualClose} className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-colors">Stäng</button>
                         </div>
                     </div>
                 </div>

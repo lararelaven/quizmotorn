@@ -311,13 +311,25 @@ export default function TeacherDashboard({ state, dispatch }) {
         }
     };
 
-    const openJeopardySetup = (quiz) => setJeopardyConfig({ quiz, teams: 3, teamNames: generateTeamNames(3) });
+    const openJeopardySetup = (quiz) => setJeopardyConfig({
+        quiz,
+        teams: 3,
+        teamNames: generateTeamNames(3),
+        scoreMode: 'progressive', // 'progressive' | 'flat'
+        columns: Math.min(6, quiz.questions.length) // Default to max 6 or question count
+    });
     const openLiveSetup = (quiz) => setLiveConfig({ quiz, timerEnabled: false, timerDuration: 30, forceRandomNames: false, scoreMode: 'speed', gamificationMode: 'none' });
 
     // --- JEOPARDY (OFFLINE / LOKALT) ---
     const startJeopardy = () => {
         if (!jeopardyConfig) return;
-        const settings = { gameMode: 'jeopardy', jeopardyTeams: jeopardyConfig.teams, teamNames: jeopardyConfig.teamNames };
+        const settings = {
+            gameMode: 'jeopardy',
+            jeopardyTeams: jeopardyConfig.teams,
+            teamNames: jeopardyConfig.teamNames,
+            scoreMode: jeopardyConfig.scoreMode,
+            columns: jeopardyConfig.columns
+        };
 
         // Körs lokalt utan databas, med dummy-data
         dispatch({
@@ -611,150 +623,178 @@ export default function TeacherDashboard({ state, dispatch }) {
                                             defaultValue={editingTemplateId ? templates.find(t => t.id === editingTemplateId)?.description : ''}
                                         />
                                     </div>
-                                    <textarea
-                                        name="prompt"
-                                        placeholder="Prompt text..."
-                                        required
-                                        className="w-full h-24 p-2 bg-slate-950 border border-white/10 rounded-lg text-white text-sm font-mono resize-none"
-                                        defaultValue={editingTemplateId ? templates.find(t => t.id === editingTemplateId)?.prompt : ''}
-                                    />
-                                    <button type="submit" className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-sm cursor-pointer">
-                                        {editingTemplateId ? 'Spara Ändringar' : 'Spara Ny Mall'}
-                                    </button>
-                                </form>
+                                    ```
+                                    ))}
                             </div>
 
-                            {/* List Existing */}
-                            <div className="space-y-2">
-                                <h4 className="font-bold text-white text-sm">Befintliga Mallar (Dra för att ändra ordning)</h4>
-                                {templates.map((tpl, idx) => (
-                                    <div
-                                        key={tpl.id}
-                                        draggable
-                                        onDragStart={(e) => handleDragStart(e, idx)}
-                                        onDragOver={(e) => handleDragOver(e, idx)}
-                                        onDragEnd={handleDragEnd}
-                                        className={`flex items-start justify-between bg-white/5 p-3 rounded-xl border transition-colors cursor-move active:cursor-grabbing ${editingTemplateId === tpl.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/5 hover:bg-white/10'}`}
-                                    >
-                                        <div>
-                                            <div className="font-bold text-white text-sm">{tpl.label}</div>
-                                            <div className="text-xs text-slate-400">{tpl.description}</div>
-                                            <div className="text-[10px] text-slate-500 font-mono mt-1 truncate max-w-md">{typeof tpl.prompt === 'string' ? tpl.prompt : '(Funktion)'}</div>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <button onClick={() => setEditingTemplateId(tpl.id)} className="p-2 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors cursor-pointer" title="Redigera"><Edit2 className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDeleteTemplate(tpl.id)} className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer" title="Ta bort"><Trash2 className="w-4 h-4" /></button>
-                                        </div>
-                                    </div>
-                                ))}
+                            <div className="bg-slate-950/50 p-3 rounded-xl text-[10px] font-mono text-slate-300 border border-white/5 h-24 overflow-y-auto shadow-inner select-all whitespace-pre-wrap no-scrollbar">
+                                {currentPromptText}
                             </div>
                         </div>
+                        <button onClick={handleCopyPrompt} className="mt-2 w-full py-2 bg-indigo-600/80 text-white font-bold rounded-lg hover:bg-indigo-500 flex items-center justify-center gap-2 text-xs transition-colors border border-white/5 cursor-pointer"><Copy className="w-3 h-3" /> Kopiera Prompt</button>
+                    </div>
+
+                    <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-2xl p-4 shadow-sm h-full flex flex-col justify-between backdrop-blur-sm">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2 text-white font-bold text-sm"><Copy className="w-4 h-4 text-indigo-400" /> Klistra in JSON</div>
+                            <textarea
+                                value={jsonInput}
+                                onChange={(e) => setJsonInput(e.target.value)}
+                                className="w-full h-32 font-mono text-[10px] p-3 bg-slate-950/50 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none mb-2 placeholder-white/20 scrollbar-hide resize-none"
+                                placeholder={DEFAULT_QUIZ_JSON}
+                            />
+                            {error && <p className="text-red-400 text-xs mb-2 bg-red-500/10 p-2 rounded border border-red-500/20">{error}</p>}
+                        </div>
+
+                        <button
+                            onClick={handleSaveQuiz}
+                            className="mt-0 w-full py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg hover:shadow-emerald-500/20 hover:scale-[1.02] flex items-center justify-center gap-2 text-xs transition-all border border-white/5 cursor-pointer shadow-lg"
+                        >
+                            <Save className="w-3 h-3" /> Spara till Bibliotek
+                        </button>
                     </div>
                 </div>
-            )}
+            </section>
 
-            {jeopardyConfig && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10 max-h-[90vh] flex flex-col">
-                        <div className="bg-gradient-to-r from-orange-500 to-pink-600 p-5 flex justify-between items-center text-white flex-shrink-0">
-                            <h3 className="font-bold text-xl flex items-center gap-2"><Grid className="w-6 h-6" /> Konfigurera Jeopardy</h3>
-                            <button onClick={() => setJeopardyConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
+            {
+        jeopardyConfig && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10 max-h-[90vh] flex flex-col">
+                    <div className="bg-gradient-to-r from-orange-500 to-pink-600 p-5 flex justify-between items-center text-white flex-shrink-0">
+                        <h3 className="font-bold text-xl flex items-center gap-2"><Grid className="w-6 h-6" /> Konfigurera Jeopardy</h3>
+                        <button onClick={() => setJeopardyConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="p-8 space-y-8 overflow-y-auto">
+                        <div>
+                            <label className="block text-sm font-bold text-slate-300 mb-3">Antal Lag: <span className="text-orange-400 text-lg ml-1">{jeopardyConfig.teams}</span></label>
+                            <input
+                                type="range" min="2" max="6"
+                                value={jeopardyConfig.teams}
+                                onChange={(e) => setJeopardyConfig(p => ({ ...p, teams: parseInt(e.target.value), teamNames: generateTeamNames(parseInt(e.target.value)) }))}
+                                className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <div className="flex justify-between text-xs text-slate-500 mt-2 font-mono px-1"><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
                         </div>
-                        <div className="p-8 space-y-8 overflow-y-auto">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-300 mb-3">Antal Lag: <span className="text-orange-400 text-lg ml-1">{jeopardyConfig.teams}</span></label>
-                                <input
-                                    type="range" min="2" max="6"
-                                    value={jeopardyConfig.teams}
-                                    onChange={(e) => setJeopardyConfig(p => ({ ...p, teams: parseInt(e.target.value), teamNames: generateTeamNames(parseInt(e.target.value)) }))}
-                                    className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                                />
-                                <div className="flex justify-between text-xs text-slate-500 mt-2 font-mono px-1"><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+                        <div className="bg-slate-950/50 p-5 rounded-2xl border border-white/10">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Genererade Lagnamn</span>
+                                <button onClick={() => setJeopardyConfig(p => ({ ...p, teamNames: generateTeamNames(p.teams) }))} className="text-xs flex items-center gap-1 text-orange-400 font-bold hover:text-orange-300 transition-colors cursor-pointer"><Shuffle className="w-3 h-3" /> Slumpa nya</button>
                             </div>
-                            <div className="bg-slate-950/50 p-5 rounded-2xl border border-white/10">
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Genererade Lagnamn</span>
-                                    <button onClick={() => setJeopardyConfig(p => ({ ...p, teamNames: generateTeamNames(p.teams) }))} className="text-xs flex items-center gap-1 text-orange-400 font-bold hover:text-orange-300 transition-colors cursor-pointer"><Shuffle className="w-3 h-3" /> Slumpa nya</button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">{jeopardyConfig.teamNames.map((name, idx) => (<div key={idx} className="bg-slate-800 px-3 py-2.5 rounded-xl border border-white/5 text-sm font-bold text-white shadow-sm text-center">{name}</div>))}</div>
-                            </div>
-                            <button onClick={startJeopardy} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-xl hover:bg-slate-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer">Starta Spelet <ArrowRight className="w-5 h-5" /></button>
+                            <div className="grid grid-cols-2 gap-3">{jeopardyConfig.teamNames.map((name, idx) => (<div key={idx} className="bg-slate-800 px-3 py-2.5 rounded-xl border border-white/5 text-sm font-bold text-white shadow-sm text-center">{name}</div>))}</div>
                         </div>
+
+                        {/* Score Mode Selection */}
+                        <div className="bg-slate-950/50 p-5 rounded-2xl border border-white/10">
+                            <label className="block text-sm font-bold text-slate-300 mb-3">Poängsystem</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={() => setJeopardyConfig(p => ({ ...p, scoreMode: 'progressive' }))}
+                                    className={`p-3 rounded-xl border text-sm font-bold transition-all ${jeopardyConfig.scoreMode === 'progressive' ? 'bg-orange-500 text-white border-orange-400' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}
+                                >
+                                    Stegrande (100, 200...)
+                                </button>
+                                <button
+                                    onClick={() => setJeopardyConfig(p => ({ ...p, scoreMode: 'flat' }))}
+                                    className={`p-3 rounded-xl border text-sm font-bold transition-all ${jeopardyConfig.scoreMode === 'flat' ? 'bg-orange-500 text-white border-orange-400' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}
+                                >
+                                    Alla lika (100p)
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Column Count Selection */}
+                        <div>
+                            <label className="block text-sm font-bold text-slate-300 mb-3">Antal Kolumner: <span className="text-orange-400 text-lg ml-1">{jeopardyConfig.columns}</span></label>
+                            <input
+                                type="range" min="1" max="6"
+                                value={jeopardyConfig.columns}
+                                onChange={(e) => setJeopardyConfig(p => ({ ...p, columns: parseInt(e.target.value) }))}
+                                className="w-full accent-orange-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <div className="flex justify-between text-xs text-slate-500 mt-2 font-mono px-1"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span></div>
+                        </div>
+                        <button onClick={startJeopardy} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-xl hover:bg-slate-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer">Starta Spelet <ArrowRight className="w-5 h-5" /></button>
                     </div>
                 </div>
-            )}
-            {liveConfig && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10 max-h-[90vh] flex flex-col">
-                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 flex justify-between items-center text-white flex-shrink-0">
-                            <h3 className="font-bold text-xl flex items-center gap-2"><Smartphone className="w-6 h-6" /> Konfigurera Live Quiz</h3>
-                            <button onClick={() => setLiveConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+        )
+    }
+
+    {
+        liveConfig && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-white/10 max-h-[90vh] flex flex-col">
+                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 flex justify-between items-center text-white flex-shrink-0">
+                        <h3 className="font-bold text-xl flex items-center gap-2"><Smartphone className="w-6 h-6" /> Konfigurera Live Quiz</h3>
+                        <button onClick={() => setLiveConfig(null)} className="hover:bg-white/20 p-2 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="p-8 space-y-6 overflow-y-auto no-scrollbar">
+                        <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/10">
+                            <div><div className="font-bold text-white">Tvinga slumpade namn</div><div className="text-xs text-slate-400 mt-1">Förhindrar olämpliga namn</div></div>
+                            <button onClick={() => setLiveConfig(p => ({ ...p, forceRandomNames: !p.forceRandomNames }))} className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.forceRandomNames ? 'bg-green-500' : 'bg-slate-600'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.forceRandomNames ? 'left-7' : 'left-1'}`} /></button>
                         </div>
-                        <div className="p-8 space-y-6 overflow-y-auto no-scrollbar">
-                            <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-2xl border border-white/10">
-                                <div><div className="font-bold text-white">Tvinga slumpade namn</div><div className="text-xs text-slate-400 mt-1">Förhindrar olämpliga namn</div></div>
-                                <button onClick={() => setLiveConfig(p => ({ ...p, forceRandomNames: !p.forceRandomNames }))} className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.forceRandomNames ? 'bg-green-500' : 'bg-slate-600'}`}><div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.forceRandomNames ? 'left-7' : 'left-1'}`} /></button>
-                            </div>
 
-                            <div className="bg-slate-800/50 p-5 rounded-2xl border border-white/10">
-                                <div className="flex items-center justify-between mb-6">
-                                    <div><div className="font-bold text-white">Tid per fråga</div><div className="text-xs text-slate-400 mt-1">Begränsa svarstiden</div></div>
-                                    <button
-                                        onClick={() => setLiveConfig(p => {
-                                            const newEnabled = !p.timerEnabled;
-                                            return { ...p, timerEnabled: newEnabled, scoreMode: newEnabled ? p.scoreMode : 'simple' };
-                                        })}
-                                        className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.timerEnabled ? 'bg-green-500' : 'bg-slate-600'}`}
-                                    >
-                                        <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.timerEnabled ? 'left-7' : 'left-1'}`} />
-                                    </button>
-                                </div>
-                                {liveConfig.timerEnabled && (
-                                    <div className="animate-fade-in">
-                                        <div className="flex justify-between mb-3 text-sm font-bold text-slate-300"><span>10s</span><span className="text-indigo-400">{liveConfig.timerDuration} sekunder</span><span>60s</span></div>
-                                        <input type="range" min="10" max="60" step="5" value={liveConfig.timerDuration} onChange={(e) => setLiveConfig(p => ({ ...p, timerDuration: parseInt(e.target.value) }))} className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
-                                    </div>
-                                )}
+                        <div className="bg-slate-800/50 p-5 rounded-2xl border border-white/10">
+                            <div className="flex items-center justify-between mb-6">
+                                <div><div className="font-bold text-white">Tid per fråga</div><div className="text-xs text-slate-400 mt-1">Begränsa svarstiden</div></div>
+                                <button
+                                    onClick={() => setLiveConfig(p => {
+                                        const newEnabled = !p.timerEnabled;
+                                        return { ...p, timerEnabled: newEnabled, scoreMode: newEnabled ? p.scoreMode : 'simple' };
+                                    })}
+                                    className={`w-14 h-8 rounded-full transition-colors relative cursor-pointer ${liveConfig.timerEnabled ? 'bg-green-500' : 'bg-slate-600'}`}
+                                >
+                                    <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm ${liveConfig.timerEnabled ? 'left-7' : 'left-1'}`} />
+                                </button>
                             </div>
-
                             {liveConfig.timerEnabled && (
-                                <div className="flex items-center justify-between p-5 bg-slate-800/50 rounded-2xl border border-white/10 animate-fade-in">
-                                    <div><div className="font-bold text-white">Poängsystem</div><div className="text-xs text-slate-400 mt-1">{liveConfig.scoreMode === 'speed' ? 'Hastighet ger mer poäng' : 'Bara rätt svar (Enkelt)'}</div></div>
-                                    <div className="flex bg-slate-950 rounded-xl p-1 border border-white/5">
-                                        <button onClick={() => setLiveConfig(p => ({ ...p, scoreMode: 'speed' }))} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.scoreMode === 'speed' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Zap className="w-3 h-3" /> Snabbhet</button>
-                                        <button onClick={() => setLiveConfig(p => ({ ...p, scoreMode: 'simple' }))} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.scoreMode === 'simple' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><CheckCircle className="w-3 h-3" /> Enkelt</button>
-                                    </div>
+                                <div className="animate-fade-in">
+                                    <div className="flex justify-between mb-3 text-sm font-bold text-slate-300"><span>10s</span><span className="text-indigo-400">{liveConfig.timerDuration} sekunder</span><span>60s</span></div>
+                                    <input type="range" min="10" max="60" step="5" value={liveConfig.timerDuration} onChange={(e) => setLiveConfig(p => ({ ...p, timerDuration: parseInt(e.target.value) }))} className="w-full accent-indigo-500 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
                                 </div>
                             )}
+                        </div>
 
-                            <div className="flex items-center justify-between p-5 bg-slate-800/50 rounded-2xl border border-white/10">
-                                <div>
-                                    <div className="font-bold text-white">Tävlingsform</div>
-                                    <div className="text-xs text-slate-400 mt-1">
-                                        {liveConfig.gamificationMode === 'hybris' ? 'Satsa poäng på ditt svar' : 'Standard quiz'}
-                                    </div>
-                                </div>
+                        {liveConfig.timerEnabled && (
+                            <div className="flex items-center justify-between p-5 bg-slate-800/50 rounded-2xl border border-white/10 animate-fade-in">
+                                <div><div className="font-bold text-white">Poängsystem</div><div className="text-xs text-slate-400 mt-1">{liveConfig.scoreMode === 'speed' ? 'Hastighet ger mer poäng' : 'Bara rätt svar (Enkelt)'}</div></div>
                                 <div className="flex bg-slate-950 rounded-xl p-1 border border-white/5">
-                                    <button
-                                        onClick={() => setLiveConfig(p => ({ ...p, gamificationMode: 'none' }))}
-                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.gamificationMode === 'none' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                                    >
-                                        Ingen
-                                    </button>
-                                    <button
-                                        onClick={() => setLiveConfig(p => ({ ...p, gamificationMode: 'hybris' }))}
-                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.gamificationMode === 'hybris' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                                    >
-                                        <Trophy className="w-3 h-3" /> Hybris
-                                    </button>
+                                    <button onClick={() => setLiveConfig(p => ({ ...p, scoreMode: 'speed' }))} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.scoreMode === 'speed' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><Zap className="w-3 h-3" /> Snabbhet</button>
+                                    <button onClick={() => setLiveConfig(p => ({ ...p, scoreMode: 'simple' }))} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.scoreMode === 'simple' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}><CheckCircle className="w-3 h-3" /> Enkelt</button>
                                 </div>
                             </div>
+                        )}
 
-                            <button onClick={startLive} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-xl hover:bg-slate-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer">Starta Quiz <ArrowRight className="w-5 h-5" /></button>
+                        <div className="flex items-center justify-between p-5 bg-slate-800/50 rounded-2xl border border-white/10">
+                            <div>
+                                <div className="font-bold text-white">Tävlingsform</div>
+                                <div className="text-xs text-slate-400 mt-1">
+                                    {liveConfig.gamificationMode === 'hybris' ? 'Satsa poäng på ditt svar' : 'Standard quiz'}
+                                </div>
+                            </div>
+                            <div className="flex bg-slate-950 rounded-xl p-1 border border-white/5">
+                                <button
+                                    onClick={() => setLiveConfig(p => ({ ...p, gamificationMode: 'none' }))}
+                                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.gamificationMode === 'none' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    Ingen
+                                </button>
+                                <button
+                                    onClick={() => setLiveConfig(p => ({ ...p, gamificationMode: 'hybris' }))}
+                                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${liveConfig.gamificationMode === 'hybris' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    <Trophy className="w-3 h-3" /> Hybris
+                                </button>
+                            </div>
                         </div>
+
+                        <button onClick={startLive} className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-lg shadow-xl hover:bg-slate-100 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 cursor-pointer">Starta Quiz <ArrowRight className="w-5 h-5" /></button>
                     </div>
                 </div>
-            )}
-        </div>
+            </div>
+        )
+    }
+        </div >
     );
 }
+```
